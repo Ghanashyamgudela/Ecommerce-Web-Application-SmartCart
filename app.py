@@ -51,11 +51,12 @@ os.makedirs(ADMIN_UPLOAD_FOLDER, exist_ok=True)
 # MySQL connection is configured in config.py
 def get_db_connection():
     # If a DATABASE_URL is provided (e.g. in production), use it directly
+    database_url = os.getenv("DATABASE_URL")
     conn = psycopg2.connect(
-    os.getenv("DATABASE_URL"),
-    sslmode="require",
-    cursor_factory=psycopg2.extras.RealDictCursor,
-        )
+        database_url,
+        cursor_factory=psycopg2.extras.RealDictCursor
+    )
+
     conn.set_client_encoding('UTF8')
     return conn
 
