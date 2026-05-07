@@ -157,8 +157,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-with app.app_context():
-    init_db()
+
 
 
 # ================================================================
@@ -1694,6 +1693,7 @@ def inject_categories():
 
 if __name__ == '__main__':
     import sys
+    with app.app_context():
     init_db()
 
     if '--create-super-admin' in sys.argv:
