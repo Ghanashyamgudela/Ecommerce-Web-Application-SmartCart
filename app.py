@@ -13,6 +13,7 @@ import uuid
 from utils.pdf_generator import generate_pdf
 from datetime import datetime
 
+
 app = Flask(__name__)
 
 
@@ -1790,4 +1791,4 @@ if __name__ == '__main__':
             print("[startup] No admins found — seeding Super Admin...")
             seed_super_admin()
 
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
