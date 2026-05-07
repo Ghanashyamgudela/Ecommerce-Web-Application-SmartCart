@@ -37,10 +37,22 @@ razorpay_client = razorpay.Client(
 app.config['MAIL_SERVER'] = config.MAIL_SERVER
 app.config['MAIL_PORT'] = config.MAIL_PORT
 app.config['MAIL_USE_TLS'] = config.MAIL_USE_TLS
+app.config['MAIL_USE_SSL'] = config.MAIL_USE_SSL
 app.config['MAIL_USERNAME'] = config.MAIL_USERNAME
 app.config['MAIL_PASSWORD'] = config.MAIL_PASSWORD
 
 mail = Mail(app)
+import threading
+
+def send_email(msg):
+    def _send():
+        with app.app_context():
+            try:
+                send_email(msg)
+            except Exception as e:
+                app.logger.error(f"Email failed: {e}")
+
+    threading.Thread(target=_send).start()
 
 UPLOAD_FOLDER = 'static/uploads/product_images'
 ADMIN_UPLOAD_FOLDER = 'static/uploads/admin_profiles'
@@ -217,7 +229,7 @@ def admin_signup():
     try:
         msg = Message("ShopCart Admin OTP", sender=config.MAIL_USERNAME, recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Registration is: {otp}\n\nThis OTP is valid for 10 minutes."
-        mail.send(msg)
+        send_email(msg)
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
@@ -315,7 +327,7 @@ def verify_otp_post():
                             f"Login URL : {url_for('admin_login', _external=True)}\n\n"
                             f"Regards,\nShopCart System"
                         )
-                    mail.send(msg)
+                    send_email(msg)
         except Exception as mail_err:
             app.logger.error("Failed to notify super admin(s): %s", mail_err)
             try:
@@ -400,7 +412,7 @@ def admin_forgot_password():
     try:
         msg = Message("ShopCart Password Reset OTP", sender=config.MAIL_USERNAME, recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
-        mail.send(msg)
+        send_email(msg)
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
@@ -555,7 +567,7 @@ def approve_request(req_id):
                 "If you did not request this account, please contact support.\n\n"
                 "Regards,\nShopCart Team"
             )
-            mail.send(msg)
+            send_email(msg)
             flash("Approval email sent to the admin.", "success")
         except Exception as e:
             # don't block the flow on mail errors; notify the super admin
@@ -690,7 +702,7 @@ def revoke_request(req_id):
                     "If you believe this is a mistake, please contact the site administrator.\n\n"
                     "Regards,\nShopCart Team"
                 )
-                mail.send(msg)
+                send_email(msg)
                 flash("Revocation email sent to the admin.", "success")
             except Exception as e:
                 flash(f"Revoked but failed to send email: {e}", "warning")
@@ -1145,7 +1157,7 @@ def user_forgot_password():
     try:
         msg = Message("ShopCart Password Reset OTP", sender=config.MAIL_USERNAME, recipients=[email])
         msg.body = f"Your OTP for ShopCart Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
-        mail.send(msg)
+        send_email(msg)
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
