@@ -14,8 +14,7 @@ from utils.pdf_generator import generate_pdf
 from datetime import datetime
 
 app = Flask(__name__)
-with app.app_context():
-    init_db()
+
 
 @app.template_filter('fdate')
 def fdate_filter(value, fmt='%d %b %Y'):
@@ -158,6 +157,8 @@ def init_db():
 
     conn.commit()
     conn.close()
+with app.app_context():
+    init_db()
 
 
 # ================================================================
