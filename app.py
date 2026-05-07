@@ -51,15 +51,10 @@ os.makedirs(ADMIN_UPLOAD_FOLDER, exist_ok=True)
 # MySQL connection is configured in config.py
 def get_db_connection():
     # If a DATABASE_URL is provided (e.g. in production), use it directly
-    if getattr(config, 'DATABASE_URL', None):
-        conn = psycopg2.connect(dsn=config.DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    else:
-        conn = psycopg2.connect(
-            host=config.DB_HOST,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            dbname=config.DB_NAME,
-            cursor_factory=psycopg2.extras.RealDictCursor,
+    conn = psycopg2.connect(
+    os.getenv("DATABASE_URL"),
+    sslmode="require",
+    cursor_factory=psycopg2.extras.RealDictCursor,
         )
     conn.set_client_encoding('UTF8')
     return conn
@@ -1468,7 +1463,7 @@ def verify_payment():
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (user_id, razorpay_order_id, razorpay_payment_id, total_amount, 'paid', full_address))
 
-        order_db_id = cursor.lastrowid
+        order_db_id = cursor.fetchone()['order_id']
 
         for pid_str, item in cart.items():
             product_id = int(pid_str)
