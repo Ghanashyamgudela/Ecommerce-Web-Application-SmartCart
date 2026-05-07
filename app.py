@@ -1434,93 +1434,147 @@ def user_pay():
 
 @app.route('/verify-payment', methods=['POST'])
 def verify_payment():
+
     if 'user_id' not in session:
         flash("Please login.", "danger")
         return redirect('/user-login')
 
     razorpay_payment_id = request.form.get('razorpay_payment_id')
-    razorpay_order_id   = request.form.get('razorpay_order_id')
-    razorpay_signature  = request.form.get('razorpay_signature')
-    delivery_name       = request.form.get('delivery_name', '')
-    delivery_phone      = request.form.get('delivery_phone', '')
-    delivery_address    = request.form.get('delivery_address', '')
-    delivery_city       = request.form.get('delivery_city', '')
-    delivery_state      = request.form.get('delivery_state', '')
-    delivery_pincode    = request.form.get('delivery_pincode', '')
+    razorpay_order_id = request.form.get('razorpay_order_id')
+    razorpay_signature = request.form.get('razorpay_signature')
+
+    delivery_name = request.form.get('delivery_name', '')
+    delivery_phone = request.form.get('delivery_phone', '')
+    delivery_address = request.form.get('delivery_address', '')
+    delivery_city = request.form.get('delivery_city', '')
+    delivery_state = request.form.get('delivery_state', '')
+    delivery_pincode = request.form.get('delivery_pincode', '')
 
     if not (razorpay_payment_id and razorpay_order_id and razorpay_signature):
         flash("Payment verification failed.", "danger")
         return redirect('/user/cart')
 
     try:
+
         razorpay_client.utility.verify_payment_signature({
-            'razorpay_order_id':   razorpay_order_id,
+            'razorpay_order_id': razorpay_order_id,
             'razorpay_payment_id': razorpay_payment_id,
-            'razorpay_signature':  razorpay_signature
+            'razorpay_signature': razorpay_signature
         })
+
     except Exception as e:
+
         app.logger.error("Signature verification failed: %s", e)
+
         flash("Payment verification failed. Contact support.", "danger")
+
         return redirect('/user/cart')
 
-    user_id      = session['user_id']
-    cart         = session.get('cart', {})
-    total_amount = sum(i['price'] * i['quantity'] for i in cart.values())
-    full_address = f"{delivery_name}, {delivery_phone}, {delivery_address}, {delivery_city}, {delivery_state} - {delivery_pincode}"
+    user_id = session['user_id']
 
-    conn   = get_db_connection()
+    cart = session.get('cart', {})
+
+    total_amount = sum(
+        item['price'] * item['quantity']
+        for item in cart.values()
+    )
+
+    full_address = (
+        f"{delivery_name}, "
+        f"{delivery_phone}, "
+        f"{delivery_address}, "
+        f"{delivery_city}, "
+        f"{delivery_state} - {delivery_pincode}"
+    )
+
+    conn = get_db_connection()
+
     cursor = conn.cursor()
 
     try:
+
         cursor.execute("""
-        INSERT INTO orders
-        (
+            INSERT INTO orders
+            (
+                user_id,
+                razorpay_order_id,
+                razorpay_payment_id,
+                amount,
+                payment_status,
+                delivery_address
+            )
+            VALUES (%s,%s,%s,%s,%s,%s)
+            RETURNING order_id
+        """, (
             user_id,
             razorpay_order_id,
             razorpay_payment_id,
-            amount,
-            payment_status,
-            delivery_address
-        )
-        VALUES (%s,%s,%s,%s,%s,%s)
-        RETURNING order_id
-    """, (
-        user_id,
-        razorpay_order_id,
-        razorpay_payment_id,
-        total_amount,
-        'paid',
-        full_address
-    ))
+            total_amount,
+            'paid',
+            full_address
+        ))
 
-    order_db_id = cursor.fetchone()['order_id']
+        order_db_id = cursor.fetchone()['order_id']
 
         for pid_str, item in cart.items():
+
             product_id = int(pid_str)
-            cursor.execute("""
-                INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
-                VALUES (%s,%s,%s,%s,%s)
-            """, (order_db_id, product_id, item['name'], item['quantity'], item['price']))
 
             cursor.execute("""
-                UPDATE products SET quantity = GREATEST(quantity - %s, 0)
+                INSERT INTO order_items
+                (
+                    order_id,
+                    product_id,
+                    product_name,
+                    quantity,
+                    price
+                )
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                order_db_id,
+                product_id,
+                item['name'],
+                item['quantity'],
+                item['price']
+            ))
+
+            cursor.execute("""
+                UPDATE products
+                SET quantity = GREATEST(quantity - %s, 0)
                 WHERE product_id = %s
-            """, (item['quantity'], product_id))
+            """, (
+                item['quantity'],
+                product_id
+            ))
 
         conn.commit()
+
         session.pop('cart', None)
+
         session.pop('razorpay_order_id', None)
 
         flash("Payment successful and order placed!", "success")
+
         return redirect(f"/user/order-success/{order_db_id}")
 
     except Exception as e:
+
         conn.rollback()
-        app.logger.error("Order storage failed: %s\n%s", str(e), traceback.format_exc())
+
+        app.logger.error(
+            "Order storage failed: %s\n%s",
+            str(e),
+            traceback.format_exc()
+        )
+
         flash("Error saving order. Contact support.", "danger")
+
         return redirect('/user/cart')
+
     finally:
+
         cursor.close()
+
         conn.close()
 
 
