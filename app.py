@@ -1473,19 +1473,25 @@ def verify_payment():
 
     try:
         cursor.execute("""
-    INSERT INTO orders
-    (user_id, razorpay_order_id, razorpay_payment_id,
-     amount, payment_status, delivery_address)
-    VALUES (%s,%s,%s,%s,%s,%s)
-    RETURNING order_id
-""", (
-    user_id,
-    razorpay_order_id,
-    razorpay_payment_id,
-    total_amount,
-    'paid',
-    full_address
-))
+        INSERT INTO orders
+        (
+            user_id,
+            razorpay_order_id,
+            razorpay_payment_id,
+            amount,
+            payment_status,
+            delivery_address
+        )
+        VALUES (%s,%s,%s,%s,%s,%s)
+        RETURNING order_id
+    """, (
+        user_id,
+        razorpay_order_id,
+        razorpay_payment_id,
+        total_amount,
+        'paid',
+        full_address
+    ))
 
     order_db_id = cursor.fetchone()['order_id']
 
