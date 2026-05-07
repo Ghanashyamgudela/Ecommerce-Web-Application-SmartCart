@@ -1,0 +1,19 @@
+.cursor {
+    width: 12px; height: 12px;
+    background: var(--amazon-yellow, #f0c040);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 99999;
+    transition: transform 0.15s ease;
+    mix-blend-mode: difference;
+}
+.cursor-ring {
+    width: 36px; height: 36px;
+    border: 1.5px solid rgba(240,192,64,0.45);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 99998;
+    transition: all 0.12s ease;
+}

@@ -1,0 +1,13 @@
+Flask==3.1.3
+Flask-Mail==0.10.0
+psycopg2-binary==2.9.6
+bcrypt==5.0.0
+razorpay==2.0.1
+xhtml2pdf==0.2.17
+reportlab==4.5.0
+Pillow==12.2.0
+Werkzeug==3.1.8
+# Notes:
+# - Many packages in the original requirements.txt appear unused by the application's codebase.
+# - Flask pulls in Jinja2, itsdangerous, MarkupSafe, and Werkzeug as dependencies; they are included here for clarity.
+# - Keep other packages only if you rely on features/tools not present in the repository (e.g., pyHanko, pyPDF, svg libraries).
