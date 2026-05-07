@@ -1487,7 +1487,7 @@ def verify_payment():
     full_address
 ))
 
-order_db_id = cursor.fetchone()['order_id']
+    order_db_id = cursor.fetchone()['order_id']
 
         for pid_str, item in cart.items():
             product_id = int(pid_str)
