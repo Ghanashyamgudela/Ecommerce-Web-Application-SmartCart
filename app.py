@@ -51,12 +51,23 @@ os.makedirs(ADMIN_UPLOAD_FOLDER, exist_ok=True)
 
 # MySQL connection is configured in config.py
 def get_db_connection():
-    # If a DATABASE_URL is provided (e.g. in production), use it directly
+
     database_url = os.getenv("DATABASE_URL")
-    conn = psycopg2.connect(
-        database_url,
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
+
+    if database_url:
+        conn = psycopg2.connect(
+            database_url,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+    else:
+        conn = psycopg2.connect(
+            host=config.DB_HOST,
+            database=config.DB_NAME,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            port=config.DB_PORT,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
 
     conn.set_client_encoding('UTF8')
     return conn
@@ -1462,11 +1473,21 @@ def verify_payment():
 
     try:
         cursor.execute("""
-            INSERT INTO orders (user_id, razorpay_order_id, razorpay_payment_id, amount, payment_status, delivery_address)
-            VALUES (%s,%s,%s,%s,%s,%s)
-        """, (user_id, razorpay_order_id, razorpay_payment_id, total_amount, 'paid', full_address))
+    INSERT INTO orders
+    (user_id, razorpay_order_id, razorpay_payment_id,
+     amount, payment_status, delivery_address)
+    VALUES (%s,%s,%s,%s,%s,%s)
+    RETURNING order_id
+""", (
+    user_id,
+    razorpay_order_id,
+    razorpay_payment_id,
+    total_amount,
+    'paid',
+    full_address
+))
 
-        order_db_id = cursor.fetchone()['order_id']
+order_db_id = cursor.fetchone()['order_id']
 
         for pid_str, item in cart.items():
             product_id = int(pid_str)
