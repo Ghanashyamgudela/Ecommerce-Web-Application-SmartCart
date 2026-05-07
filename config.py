@@ -1,20 +1,31 @@
-SECRET_KEY = "abe123"
+import os
 
-RAZORPAY_KEY_ID = "rzp_test_SlGbnJzNHYY2kL"
-RAZORPAY_KEY_SECRET = "6v9njW4QuWqc95585eUo7xwr"
+# =========================================================
+# APP SECRET
+# =========================================================
+SECRET_KEY = os.getenv("SECRET_KEY", "abe123")
 
-DB_HOST = "localhost"
-DB_USER = "root"
-DB_PASSWORD = "Ghana@1230"
-DB_NAME = "smartcart_db"
+# =========================================================
+# RAZORPAY
+# =========================================================
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
+# =========================================================
+# POSTGRESQL / NEON DATABASE
+# =========================================================
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# =========================================================
+# MAIL CONFIG
+# =========================================================
 MAIL_SERVER = 'smtp.gmail.com'
 MAIL_PORT = 587
 MAIL_USE_TLS = True
-MAIL_USERNAME = 'ghana19183@gmail.com'
-MAIL_PASSWORD = 'jmwe kafu lmdp cmpr'
+MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 
-# When set to a non-empty string, `seed_super_admin()` will create/upgrade
-# this email as the Super Admin. Leave empty or None to disable automatic
-# super-admin seeding and remove any hard-coded super-admins.
+# =========================================================
+# SUPER ADMIN
+# =========================================================
 SUPER_ADMIN_EMAIL = 'ghana19183@gmail.com'
