@@ -9,7 +9,7 @@
         <div class="card-body">
             <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:1px solid var(--gray-300);">
                 {% if admin.profile_image %}
-                <img src="{{ url_for('static', filename='uploads/admin_profiles/' ~ admin.profile_image) }}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--amazon-orange);" alt="Profile">
+                <img src="{{ resolve_admin_image(admin.profile_image) }}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--amazon-orange);" alt="Profile">
                 {% else %}
                 <div style="width:80px;height:80px;border-radius:50%;background:var(--amazon-orange);display:flex;align-items:center;justify-content:center;font-size:1.75rem;font-weight:800;color:var(--amazon-navy);">{{ admin.name[0].upper() }}</div>
                 {% endif %}
@@ -53,7 +53,7 @@
                     <div style="font-weight:700;margin-bottom:0.5rem;">Preview</div>
                     <div style="width:160px;height:160px;border-radius:8px;border:1px solid var(--gray-200);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--gray-50);">
                         {% if admin.profile_image %}
-                            <img id="preview_img" src="{{ url_for('static', filename='uploads/admin_profiles/' ~ admin.profile_image) }}" alt="Preview" style="width:100%;height:100%;object-fit:cover;display:block;">
+                            <img id="preview_img" src="{{ resolve_admin_image(admin.profile_image) }}" alt="Preview" style="width:100%;height:100%;object-fit:cover;display:block;">
                         {% else %}
                             <img id="preview_img" src="" alt="Preview" style="width:100%;height:100%;object-fit:cover;display:none;">
                         {% endif %}
