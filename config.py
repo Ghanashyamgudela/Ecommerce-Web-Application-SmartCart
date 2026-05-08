@@ -4,7 +4,11 @@ import os
 # APP SECRET
 # =========================================================
 SECRET_KEY = os.environ.get("SECRET_KEY")
-
+# =========================================================
+# RESEND CONFIG
+# =========================================================
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 # =========================================================
 # RAZORPAY
 # =========================================================
