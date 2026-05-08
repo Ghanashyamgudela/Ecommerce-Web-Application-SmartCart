@@ -28,6 +28,15 @@ MAIL_USE_TLS = True
 MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
 MAIL_PASSWORD =  os.environ.get("MAIL_PASSWORD")
 
+
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
+
+# Optional explicit parts (used if CLOUDINARY_URL is not provided)
+CLOUDINARY = {
+	"cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
+	"api_key": os.getenv("CLOUDINARY_API_KEY"),
+	"api_secret": os.getenv("CLOUDINARY_API_SECRET"),
+}
 # =========================================================
 # SUPER ADMIN
 # =========================================================
