@@ -12,9 +12,35 @@ import traceback
 import uuid
 from utils.pdf_generator import generate_pdf
 from datetime import datetime
+import cloudinary
+import cloudinary.uploader
 
 
 app = Flask(__name__)
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET")
+)
+
+# Template helpers to resolve image URLs stored in DB. If the stored value is
+# already a full URL (Cloudinary), return it. Otherwise, return a static URL
+# under `uploads/<folder>/`.
+def resolve_image_url(img, folder='product_images'):
+    if not img:
+        return ''
+    try:
+        if img.startswith('http'):
+            return img
+    except Exception:
+        pass
+    return url_for('static', filename=f'uploads/{folder}/' + img)
+
+def resolve_admin_image(img):
+    return resolve_image_url(img, folder='admin_profiles')
+
+app.jinja_env.globals['resolve_image_url'] = resolve_image_url
+app.jinja_env.globals['resolve_admin_image'] = resolve_admin_image
 
 
 @app.template_filter('fdate')
@@ -745,12 +771,9 @@ def add_item():
 
     saved_filenames = []
     for img in images:
-        filename = secure_filename(img.filename)
-        # make filename reasonably unique to avoid clashes
-        unique_name = f"{str(uuid.uuid4())[:8]}_{filename}"
-        image_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        img.save(image_path)
-        saved_filenames.append(unique_name)
+        upload_result = cloudinary.uploader.upload(img)
+        image_url = upload_result['secure_url']
+        saved_filenames.append(image_url)
     conn   = get_db_connection()
     cursor = conn.cursor()
     # store multiple filenames joined by '||' so existing DB schema stays unchanged
@@ -865,21 +888,27 @@ def update_item(item_id):
     old_image_name  = product['image']
 
     if new_image and new_image.filename != '':
-        new_filename = secure_filename(new_image.filename)
-        unique_name = f"{str(uuid.uuid4())[:8]}_{new_filename}"
-        new_image.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
-        # remove all old images if multiple were stored
+        # Upload new image to Cloudinary and keep URL
+        try:
+            upload_result = cloudinary.uploader.upload(new_image)
+            image_url = upload_result.get('secure_url')
+        except Exception:
+            image_url = None
+
+        # remove local files for old images (if any and if they are local filenames)
         if old_image_name:
             for old in old_image_name.split('||'):
                 if not old:
                     continue
-                old_path = os.path.join(app.config['UPLOAD_FOLDER'], old)
-                try:
-                    if os.path.exists(old_path):
-                        os.remove(old_path)
-                except Exception:
-                    pass
-        final_image = unique_name
+                if not old.startswith('http'):
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], old)
+                    try:
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                    except Exception:
+                        pass
+
+        final_image = image_url or old_image_name
     else:
         final_image = old_image_name
 
@@ -914,6 +943,9 @@ def delete_item(item_id):
     if product.get('image'):
         for fname in product['image'].split('||'):
             if not fname:
+                continue
+            # only remove local files; Cloudinary URLs are left untouched
+            if fname.startswith('http'):
                 continue
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
             try:
@@ -961,18 +993,20 @@ def admin_profile():
     hashed = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()) if new_pw else admin['password']
 
     if new_image and new_image.filename != '':
-        new_fn = secure_filename(new_image.filename)
-        # prefix with uuid to avoid name collisions
-        new_fn = f"{uuid.uuid4().hex}_{new_fn}"
-        # save using absolute path to ensure correct location
-        save_path = os.path.join(app.root_path, app.config['ADMIN_UPLOAD_FOLDER'], new_fn)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        new_image.save(save_path)
-        if old_image:
+        # upload admin profile image to Cloudinary
+        try:
+            upload_result = cloudinary.uploader.upload(new_image)
+            final_image = upload_result.get('secure_url')
+        except Exception:
+            final_image = old_image
+        # remove previous local profile image if it was a local file
+        if old_image and not old_image.startswith('http'):
             old_p = os.path.join(app.root_path, app.config['ADMIN_UPLOAD_FOLDER'], old_image)
-            if os.path.exists(old_p):
-                os.remove(old_p)
-        final_image = new_fn
+            try:
+                if os.path.exists(old_p):
+                    os.remove(old_p)
+            except Exception:
+                pass
     else:
         final_image = old_image
 
