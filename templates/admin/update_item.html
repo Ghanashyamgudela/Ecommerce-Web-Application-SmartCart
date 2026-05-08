@@ -42,7 +42,7 @@
                 <div class="form-group">
                     <label class="form-label">Current Image</label>
                     <div style="margin-bottom:0.75rem;">
-                        <img src="/static/uploads/product_images/{{ (product.image.split('||')[0] if product.image else '') }}" style="height:110px;object-fit:contain;border-radius:var(--radius-xs);border:1px solid var(--gray-300);background:var(--gray-50);padding:0.5rem;">
+                        <img src="{{ resolve_image_url(product.image.split('||')[0] if product.image else '') }}" style="height:110px;object-fit:contain;border-radius:var(--radius-xs);border:1px solid var(--gray-300);background:var(--gray-50);padding:0.5rem;">
                     </div>
                     <label class="form-label">Replace Image <span style="font-size:0.75rem;font-weight:400;color:var(--gray-500);">(leave empty to keep current)</span></label>
                     <label class="file-input-wrapper" for="new_img">
