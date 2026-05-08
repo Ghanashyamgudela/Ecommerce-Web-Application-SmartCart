@@ -215,6 +215,12 @@ def init_db():
         except Exception:
             pass
 
+    try:
+        cursor.execute("ALTER TABLE products ALTER COLUMN image TYPE TEXT")
+        cursor.execute("ALTER TABLE admin ALTER COLUMN profile_image TYPE TEXT")
+    except Exception as e:
+        print("Column update error:", e)
+
     conn.commit()
     conn.close()
 
