@@ -269,7 +269,7 @@ def admin_signup():
     session['otp_purpose'] = 'admin_signup'
 
     try:
-        msg = Message("ShopCart Admin OTP", sender=config.MAIL_USERNAME, recipients=[email])
+        msg = Message("ShopCart Admin OTP", sender="ghanashyamgudela@gmail.com", recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Registration is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
@@ -356,7 +356,7 @@ def verify_otp_post():
                 for sa in super_admins:
                     msg = Message(
                             subject="ShopCart — New Admin Registration Request",
-                            sender=config.MAIL_USERNAME,
+                            sender="ghanashyamgudela@gmail.com",
                             recipients=[sa['email']]
                         )
                     msg.body = (
@@ -452,7 +452,7 @@ def admin_forgot_password():
     session['reset_role']  = 'admin'
 
     try:
-        msg = Message("ShopCart Password Reset OTP", sender=config.MAIL_USERNAME, recipients=[email])
+        msg = Message("ShopCart Password Reset OTP", sender="ghanashyamgudela@gmail.com", recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
@@ -601,7 +601,7 @@ def approve_request(req_id):
         flash(f"Admin '{req['name']}' approved successfully!", "success")
         # send approval email to the newly approved admin
         try:
-            msg = Message("ShopCart Admin Account Approved", sender=config.MAIL_USERNAME, recipients=[req['email']])
+            msg = Message("ShopCart Admin Account Approved", sender="ghanashyamgudela@gmail.com", recipients=[req['email']])
             msg.body = (
                 f"Hello {req['name']},\n\n"
                 "Your ShopCart admin account request has been approved by the super admin.\n"
@@ -737,7 +737,7 @@ def revoke_request(req_id):
             flash(f"Approved admin '{req['name']}' revoked and removed.", "success")
             # notify the affected admin
             try:
-                msg = Message("ShopCart Admin Access Revoked", sender=config.MAIL_USERNAME, recipients=[req['email']])
+                msg = Message("ShopCart Admin Access Revoked", sender="ghanashyamgudela@gmail.com", recipients=[req['email']])
                 msg.body = (
                     f"Hello {req['name']},\n\n"
                     "Your ShopCart admin access has been revoked by the Super Admin.\n"
@@ -1216,7 +1216,7 @@ def user_forgot_password():
     session['user_reset_email'] = email
 
     try:
-        msg = Message("ShopCart Password Reset OTP", sender=config.MAIL_USERNAME, recipients=[email])
+        msg = Message("ShopCart Password Reset OTP", sender="ghanashyamgudela@gmail.com", recipients=[email])
         msg.body = f"Your OTP for ShopCart Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
