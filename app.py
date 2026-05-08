@@ -88,8 +88,8 @@ import threading
 def send_email(to, subject, html):
     try:
         resend.Emails.send({
-            "from": "onboarding@resend.dev",
-            "to": to,
+            "from": config.RESEND_FROM_EMAIL,
+            "to": [to],   # IMPORTANT → must be list
             "subject": subject,
             "html": html
         })
