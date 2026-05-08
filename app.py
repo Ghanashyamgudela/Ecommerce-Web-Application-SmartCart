@@ -621,8 +621,8 @@ def approve_request(req_id):
         conn.commit()
         flash(f"Admin '{req['name']}' approved successfully!", "success")
         # send approval email to the newly approved admin
-            try:
-                msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
+        try:
+            msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
             msg.body = (
                 f"Hello {req['name']},\n\n"
                 "Your ShopCart admin account request has been approved by the super admin.\n"
