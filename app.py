@@ -17,11 +17,21 @@ import cloudinary.uploader
 
 
 app = Flask(__name__)
-cloudinary.config(
-    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.environ.get("CLOUDINARY_API_KEY"),
-    api_secret=os.environ.get("CLOUDINARY_API_SECRET")
-)
+if config.CLOUDINARY_URL:
+    try:
+        cloudinary.config(cloudinary_url=config.CLOUDINARY_URL)
+    except Exception:
+        app.logger.warning('Invalid CLOUDINARY_URL provided; falling back to individual vars')
+else:
+    # use explicit parts if present
+    try:
+        cloudinary.config(
+            cloud_name=config.CLOUDINARY.get('cloud_name'),
+            api_key=config.CLOUDINARY.get('api_key'),
+            api_secret=config.CLOUDINARY.get('api_secret')
+        )
+    except Exception:
+        app.logger.warning('Cloudinary not configured via env vars')
 
 # Template helpers to resolve image URLs stored in DB. If the stored value is
 # already a full URL (Cloudinary), return it. Otherwise, return a static URL
@@ -771,9 +781,16 @@ def add_item():
 
     saved_filenames = []
     for img in images:
-        upload_result = cloudinary.uploader.upload(img)
-        image_url = upload_result['secure_url']
-        saved_filenames.append(image_url)
+        try:
+            upload_result = cloudinary.uploader.upload(img)
+            image_url = upload_result.get('secure_url')
+            if not image_url:
+                raise RuntimeError('Cloudinary upload did not return secure_url')
+            saved_filenames.append(image_url)
+        except Exception as e:
+            app.logger.error('Cloudinary upload failed: %s', e)
+            flash('Failed to upload images. Check Cloudinary configuration.', 'danger')
+            return redirect('/admin/add-item')
     conn   = get_db_connection()
     cursor = conn.cursor()
     # store multiple filenames joined by '||' so existing DB schema stays unchanged
@@ -892,7 +909,9 @@ def update_item(item_id):
         try:
             upload_result = cloudinary.uploader.upload(new_image)
             image_url = upload_result.get('secure_url')
-        except Exception:
+        except Exception as e:
+            app.logger.error('Cloudinary upload failed during product update: %s', e)
+            flash('Failed to upload image to Cloudinary. Keeping existing image.', 'warning')
             image_url = None
 
         # remove local files for old images (if any and if they are local filenames)
@@ -997,7 +1016,9 @@ def admin_profile():
         try:
             upload_result = cloudinary.uploader.upload(new_image)
             final_image = upload_result.get('secure_url')
-        except Exception:
+        except Exception as e:
+            app.logger.error('Cloudinary upload failed for admin profile: %s', e)
+            flash('Failed to upload profile image to Cloudinary. Keeping existing image.', 'warning')
             final_image = old_image
         # remove previous local profile image if it was a local file
         if old_image and not old_image.startswith('http'):
