@@ -84,7 +84,7 @@ def send_email(msg):
     def _send():
         with app.app_context():
             try:
-                send_email(msg)
+                mail.send(msg)
             except Exception as e:
                 app.logger.error(f"Email failed: {e}")
 
