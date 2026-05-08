@@ -472,8 +472,8 @@ def admin_forgot_password():
     session['reset_email'] = email
     session['reset_role']  = 'admin'
 
-        try:
-            msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
+    try:
+        msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
@@ -621,8 +621,8 @@ def approve_request(req_id):
         conn.commit()
         flash(f"Admin '{req['name']}' approved successfully!", "success")
         # send approval email to the newly approved admin
-            try:
-                msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
+        try:
+            msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
             msg.body = (
                 f"Hello {req['name']},\n\n"
                 "Your ShopCart admin account request has been approved by the super admin.\n"
@@ -1885,4 +1885,4 @@ if __name__ == '__main__':
             print("[startup] No admins found — seeding Super Admin...")
             seed_super_admin()
 
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))no
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
