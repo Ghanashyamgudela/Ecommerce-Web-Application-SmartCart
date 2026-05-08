@@ -76,6 +76,8 @@ app.config['MAIL_USE_TLS'] = config.MAIL_USE_TLS
 app.config['MAIL_USE_SSL'] = config.MAIL_USE_SSL
 app.config['MAIL_USERNAME'] = config.MAIL_USERNAME
 app.config['MAIL_PASSWORD'] = config.MAIL_PASSWORD
+if getattr(config, 'MAIL_USERNAME', None):
+    app.config['MAIL_DEFAULT_SENDER'] = config.MAIL_USERNAME
 
 mail = Mail(app)
 import threading
@@ -89,6 +91,25 @@ def send_email(msg):
                 app.logger.error(f"Email failed: {e}")
 
     threading.Thread(target=_send).start()
+
+
+@app.route('/_email-test', methods=['GET'])
+def email_test():
+    """Quick test route: /_email-test?to=you@example.com&subject=hi"""
+    to = request.args.get('to')
+    subject = request.args.get('subject', 'Test email from ShopCart')
+    body = request.args.get('body', 'This is a test email. If you receive this, SMTP works.')
+    if not to:
+        return jsonify({'ok': False, 'error': 'missing `to` param'}), 400
+    try:
+        msg = Message(subject, sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[to])
+        msg.body = body
+        # send synchronously so caller gets immediate result
+        mail.send(msg)
+        return jsonify({'ok': True, 'message': 'sent'})
+    except Exception as e:
+        app.logger.exception('Test email failed')
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 UPLOAD_FOLDER = 'static/uploads/product_images'
 ADMIN_UPLOAD_FOLDER = 'static/uploads/admin_profiles'
@@ -1864,4 +1885,4 @@ if __name__ == '__main__':
             print("[startup] No admins found — seeding Super Admin...")
             seed_super_admin()
 
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))no
