@@ -1885,4 +1885,4 @@ if __name__ == '__main__':
             print("[startup] No admins found — seeding Super Admin...")
             seed_super_admin()
 
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))no
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
