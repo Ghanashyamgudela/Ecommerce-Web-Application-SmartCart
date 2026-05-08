@@ -141,7 +141,7 @@
                 <tr>
                     <td style="font-weight:600;color:var(--gray-500);">#{{ product.product_id }}</td>
                     <td>
-                        <img src="/static/uploads/product_images/{{ (product.image.split('||')[0] if product.image else '') }}" class="product-thumb"
+                        <img src="{{ resolve_image_url(product.image.split('||')[0] if product.image else '') }}" class="product-thumb"
                             alt="{{ product.name }}" loading="lazy">
                     </td>
                     <td>
