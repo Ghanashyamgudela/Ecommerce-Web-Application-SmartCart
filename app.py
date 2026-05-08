@@ -82,7 +82,6 @@ app.config['MAIL_PASSWORD'] = config.MAIL_PASSWORD
 if getattr(config, 'MAIL_USERNAME', None):
     app.config['MAIL_DEFAULT_SENDER'] = config.MAIL_USERNAME
 
-mail = Mail(app)
 import threading
 
 def send_email(to, subject, html):
@@ -292,9 +291,10 @@ def admin_signup():
     session['otp_purpose'] = 'admin_signup'
 
     try:
-        msg = Message("ShopCart Admin OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
-        msg.body = f"Your OTP for ShopCart Admin Registration is: {otp}\n\nThis OTP is valid for 10 minutes."
-        send_email(msg)
+        send_email(
+    email,
+    "ShopCart Admin OTP",
+    f"<h3>Your OTP is: {otp}</h3>")
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
@@ -377,22 +377,7 @@ def verify_otp_post():
 
             if super_admins:
                 for sa in super_admins:
-                    msg = Message(
-                            subject="ShopCart — New Admin Registration Request",
-                            sender="ghanashyamgudela@gmail.com",
-                            recipients=[sa['email']]
-                        )
-                    msg.body = (
-                            f"Hello Super Admin,\n\n"
-                            f"A new admin registration request is awaiting your approval.\n\n"
-                            f"Name  : {requester_name}\n"
-                            f"Email : {requester_email}\n\n"
-                            f"Please log in to the ShopCart Admin Panel and go to\n"
-                            f"'Admin Requests' to approve or reject this request.\n\n"
-                            f"Login URL : {url_for('admin_login', _external=True)}\n\n"
-                            f"Regards,\nShopCart System"
-                        )
-                    send_email(msg)
+                    send_email(sa['email'],"ShopCart — New Admin Registration Request",f"""<p>Hello Super Admin,</p><p>New admin request:</p><p>Name: {requester_name}</p><p>Email: {requester_email}</p><a href="{url_for('admin_login', _external=True)}">Login</a>""")
         except Exception as mail_err:
             app.logger.error("Failed to notify super admin(s): %s", mail_err)
             try:
@@ -475,9 +460,11 @@ def admin_forgot_password():
     session['reset_role']  = 'admin'
 
     try:
-        msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
-        msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
-        send_email(msg)
+        send_email(
+    email,
+    "ShopCart Password Reset OTP",
+    f"<h3>Your OTP is: {otp}</h3>"
+)
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
@@ -624,15 +611,7 @@ def approve_request(req_id):
         flash(f"Admin '{req['name']}' approved successfully!", "success")
         # send approval email to the newly approved admin
         try:
-            msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
-            msg.body = (
-                f"Hello {req['name']},\n\n"
-                "Your ShopCart admin account request has been approved by the super admin.\n"
-                f"You can now sign in here: {url_for('admin_login', _external=True)}\n\n"
-                "If you did not request this account, please contact support.\n\n"
-                "Regards,\nShopCart Team"
-            )
-            send_email(msg)
+            send_email(req['email'],"ShopCart Admin Account Approved",f"""<h3>Hello {req['name']}</h3><p>Your admin account is approved.</p><a href="{url_for('admin_login', _external=True)}">Login</a>""")
             flash("Approval email sent to the admin.", "success")
         except Exception as e:
             # don't block the flow on mail errors; notify the super admin
@@ -760,14 +739,7 @@ def revoke_request(req_id):
             flash(f"Approved admin '{req['name']}' revoked and removed.", "success")
             # notify the affected admin
             try:
-                msg = Message("ShopCart Admin Access Revoked", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
-                msg.body = (
-                    f"Hello {req['name']},\n\n"
-                    "Your ShopCart admin access has been revoked by the Super Admin.\n"
-                    "If you believe this is a mistake, please contact the site administrator.\n\n"
-                    "Regards,\nShopCart Team"
-                )
-                send_email(msg)
+                send_email(req['email'],"ShopCart Admin Access Revoked",f"""<p>Hello {req['name']},</p><p>Your admin access has been revoked.</p>""")
                 flash("Revocation email sent to the admin.", "success")
             except Exception as e:
                 flash(f"Revoked but failed to send email: {e}", "warning")
@@ -1239,9 +1211,10 @@ def user_forgot_password():
     session['user_reset_email'] = email
 
     try:
-        msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
-        msg.body = f"Your OTP for ShopCart Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
-        send_email(msg)
+        send_email(
+    email,
+    "ShopCart Password Reset OTP",
+    f"<h3>Your OTP is: {otp}</h3>")
         flash("OTP sent to your email!", "success")
     except Exception as e:
         flash(f"Error sending email: {str(e)}", "danger")
