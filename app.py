@@ -14,7 +14,10 @@ from utils.pdf_generator import generate_pdf
 from datetime import datetime
 import cloudinary
 import cloudinary.uploader
+import resend
 
+
+resend.api_key = os.getenv("RESEND_API_KEY")
 
 app = Flask(__name__)
 if config.CLOUDINARY_URL:
@@ -82,34 +85,33 @@ if getattr(config, 'MAIL_USERNAME', None):
 mail = Mail(app)
 import threading
 
-def send_email(msg):
-    def _send():
-        with app.app_context():
-            try:
-                send_email(msg)
-            except Exception as e:
-                app.logger.error(f"Email failed: {e}")
-
-    threading.Thread(target=_send).start()
+def send_email(to, subject, html):
+    try:
+        resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": to,
+            "subject": subject,
+            "html": html
+        })
+    except Exception as e:
+        print("Email failed:", e)
 
 
 @app.route('/_email-test', methods=['GET'])
+@app.route('/_email-test')
 def email_test():
-    """Quick test route: /_email-test?to=you@example.com&subject=hi"""
     to = request.args.get('to')
-    subject = request.args.get('subject', 'Test email from ShopCart')
-    body = request.args.get('body', 'This is a test email. If you receive this, SMTP works.')
+
     if not to:
-        return jsonify({'ok': False, 'error': 'missing `to` param'}), 400
-    try:
-        msg = Message(subject, sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[to])
-        msg.body = body
-        # send synchronously so caller gets immediate result
-        mail.send(msg)
-        return jsonify({'ok': True, 'message': 'sent'})
-    except Exception as e:
-        app.logger.exception('Test email failed')
-        return jsonify({'ok': False, 'error': str(e)}), 500
+        return {"ok": False, "error": "missing to"}, 400
+
+    send_email(
+        to,
+        "Test Email",
+        "<h1>Working 🚀</h1>"
+    )
+
+    return {"ok": True}
 
 UPLOAD_FOLDER = 'static/uploads/product_images'
 ADMIN_UPLOAD_FOLDER = 'static/uploads/admin_profiles'
