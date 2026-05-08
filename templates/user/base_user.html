@@ -1135,7 +1135,9 @@
         let html = '<div class="dd-header">Products</div>';
         results.forEach(function(p) {
             const img = p.image
-                ? '<img class="dd-img" src="/static/uploads/product_images/'+escHtml(p.image)+'" alt="" loading="lazy">'
+                ? (p.image.indexOf('http') === 0
+                    ? '<img class="dd-img" src="'+escHtml(p.image)+'" alt="" loading="lazy">'
+                    : '<img class="dd-img" src="/static/uploads/product_images/'+escHtml(p.image)+'" alt="" loading="lazy">')
                 : '<div class="dd-placeholder">📦</div>';
             html += '<a class="dd-item" href="'+escHtml(p.url)+'">'
                   + img
