@@ -773,7 +773,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div>
-                    <div class="brand-name">🛒 Shop<span>Cart</span></div>
+                    <div class="brand-name">🛒 Smart<span>Cart</span></div>
                     <div class="admin-panel-label">Admin Panel</div>
                 </div>
                 <button class="sidebar-close" id="closeSidebar">✕</button>
@@ -852,7 +852,7 @@
                     <div class="user-info">
                     {% if session.get('admin_profile_image') %}
                         <div class="user-avatar">
-                            <img src="{{ url_for('static', filename='uploads/admin_profiles/' ~ session.get('admin_profile_image')) }}" alt="Profile">
+                            <img src="{{ resolve_admin_image(session.get('admin_profile_image')) }}" alt="Profile">
                         </div>
                     {% else %}
                         <div class="user-avatar">{{ session.get('admin_name', 'A')[0].upper() }}</div>
