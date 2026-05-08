@@ -472,8 +472,8 @@ def admin_forgot_password():
     session['reset_email'] = email
     session['reset_role']  = 'admin'
 
-        try:
-            msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
+    try:
+        msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
