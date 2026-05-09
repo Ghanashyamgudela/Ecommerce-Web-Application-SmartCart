@@ -4,11 +4,7 @@ import os
 # APP SECRET
 # =========================================================
 SECRET_KEY = os.environ.get("SECRET_KEY")
-# =========================================================
-# RESEND CONFIG
-# =========================================================
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+
 # =========================================================
 # RAZORPAY
 # =========================================================
@@ -23,15 +19,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # =========================================================
 # MAIL CONFIG
 # =========================================================
-MAIL_SERVER = os.environ.get("MAIL_SERVER")
+MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
 
-MAIL_PORT = 587
-MAIL_USE_SSL = False
+MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
+MAIL_USE_SSL = os.environ.get("MAIL_USE_SSL", "False").lower() in ("1", "true", "yes")
 
-MAIL_USE_TLS = True
+MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
 MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
-MAIL_PASSWORD =  os.environ.get("MAIL_PASSWORD")
-MAIL_DEFAULT_SENDER=os.environ.get("MAIL_DEFAULT_SENDER")
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
 
 
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
