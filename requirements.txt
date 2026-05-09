@@ -9,5 +9,5 @@ reportlab==4.5.0
 Pillow==12.2.0
 python-dotenv==1.1.1
 cloudinary==1.44.2
-resend-2.30.0
+resend==2.30.0
 
