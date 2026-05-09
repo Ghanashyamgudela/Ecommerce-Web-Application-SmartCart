@@ -574,8 +574,18 @@ def auth_google():
             app.logger.info('auth_google: parsed ID token')
         except Exception as parse_err:
             app.logger.info('auth_google: ID token parse failed: %s', parse_err)
-            # fallback to userinfo endpoint
-            resp = oauth.google.get('userinfo')
+            # fallback to userinfo endpoint; prefer endpoint from server metadata if available
+            userinfo_endpoint = None
+            try:
+                metadata = getattr(oauth.google, 'server_metadata', None)
+                if isinstance(metadata, dict):
+                    userinfo_endpoint = metadata.get('userinfo_endpoint')
+            except Exception:
+                userinfo_endpoint = None
+            if not userinfo_endpoint:
+                userinfo_endpoint = 'https://openidconnect.googleapis.com/v1/userinfo'
+            app.logger.info('auth_google: fetching userinfo from %s', userinfo_endpoint)
+            resp = oauth.google.get(userinfo_endpoint)
             app.logger.info('auth_google: userinfo endpoint status=%s', getattr(resp, 'status_code', None))
             userinfo = resp.json()
         email = userinfo.get('email')
