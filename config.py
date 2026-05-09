@@ -19,14 +19,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # =========================================================
 # MAIL CONFIG
 # =========================================================
-MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
+MAIL_SERVER = os.environ.get("MAIL_SERVER")
 
-MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
-MAIL_USE_SSL = os.environ.get("MAIL_USE_SSL", "False").lower() in ("1", "true", "yes")
+MAIL_PORT = 587
+MAIL_USE_SSL = False
 
-MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
+MAIL_USE_TLS = True
 MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+MAIL_PASSWORD =  os.environ.get("MAIL_PASSWORD")
 
 
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
@@ -41,3 +41,10 @@ CLOUDINARY = {
 # SUPER ADMIN
 # =========================================================
 SUPER_ADMIN_EMAIL = 'ghana19183@gmail.com'
+
+# =========================================================
+# SENDGRID
+# =========================================================
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+# Optional default sender address for SendGrid (falls back to MAIL_USERNAME)
+SENDGRID_SENDER = os.environ.get("SENDGRID_SENDER")
