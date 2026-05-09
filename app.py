@@ -123,7 +123,7 @@ def send_email(msg):
 
                 email = SGMail(from_email=sender,to_emails=recipients,subject=subject,plain_text_content=body)
 
-response = sg.send(email)
+                response = sg.send(email)
             except Exception as e:
                 app.logger.error(f"Email failed: {e}")
 
