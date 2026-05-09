@@ -105,6 +105,30 @@
             background: linear-gradient(to bottom, #f5d78e, #edb932);
         }
 
+        .social-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-social {
+            flex: 1;
+            padding: 0.65rem;
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-google { background: #db4437; }
+        .btn-facebook { background: #1877f2; }
+
         .login-section {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
@@ -209,6 +233,12 @@
 
                 <button type="submit" class="btn-signup">Create Account</button>
             </form>
+
+            <div class="divider" style="margin-top:1rem"><span>or continue with</span></div>
+            <div class="social-row">
+                <a class="btn-social btn-google" href="/login/google">Continue with Google</a>
+                <a class="btn-social btn-facebook" href="/login/facebook">Continue with Facebook</a>
+            </div>
 
             <div class="login-section">
                 <p>Already have an account?</p>
