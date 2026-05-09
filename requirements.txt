@@ -2,12 +2,16 @@ gunicorn==26.0.0
 Flask==3.1.3
 Flask-Mail==0.10.0
 bcrypt==5.0.0
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.6
 razorpay==2.0.1
 xhtml2pdf==0.2.17
 reportlab==4.5.0
 Pillow==12.2.0
 python-dotenv==1.1.1
-cloudinary==1.44.2
-resend==2.30.0
 
+# Notes:
+# - This is a minimal requirements file for running the application. Other packages
+#   previously present in the repository appeared to be unrelated development or
+#   data-science dependencies and were removed for a leaner deployment.
+cloudinary==1.30.0
+sendgrid==6.9.1
