@@ -91,7 +91,8 @@ if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLI
         api_base_url='https://graph.facebook.com/',
         access_token_url='https://graph.facebook.com/v12.0/oauth/access_token',
         authorize_url='https://www.facebook.com/v12.0/dialog/oauth',
-        client_kwargs={'scope': 'email public_profile'},
+        # Use comma-separated scopes for Facebook to avoid scope parsing issues.
+        client_kwargs={'scope': 'email,public_profile'},
     )
 
 razorpay_client = razorpay.Client(
@@ -697,6 +698,27 @@ def debug_oauth():
         return jsonify(data)
     except Exception as e:
         app.logger.exception('debug_oauth failed: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/debug/products')
+def debug_products():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT product_id, name, image FROM products ORDER BY product_id DESC LIMIT 20")
+        rows = cursor.fetchall()
+        conn.close()
+        out = []
+        for r in rows:
+            out.append({
+                'product_id': r.get('product_id'),
+                'name': r.get('name'),
+                'image_raw': r.get('image')
+            })
+        return jsonify({'count': len(out), 'products': out})
+    except Exception as e:
+        app.logger.exception('debug_products failed: %s', e)
         return jsonify({'error': str(e)}), 500
 
 
