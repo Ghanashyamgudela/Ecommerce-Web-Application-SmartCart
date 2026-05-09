@@ -60,3 +60,8 @@ FACEBOOK_CLIENT_SECRET = os.environ.get("FACEBOOK_CLIENT_SECRET")
 
 # Optional redirect hosts if you need to override
 OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE")
+
+# Explicit OAuth redirect URIs (optional). If not set, they will be
+# derived from `OAUTH_REDIRECT_BASE` when that is provided.
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/google/callback" if OAUTH_REDIRECT_BASE else None)
+FACEBOOK_REDIRECT_URI = os.environ.get("FACEBOOK_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/facebook/callback" if OAUTH_REDIRECT_BASE else None)
