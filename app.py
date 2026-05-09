@@ -84,51 +84,39 @@ if getattr(config, 'MAIL_USERNAME', None):
 import threading
 
 def send_email(msg):
-    """Send email asynchronously using SendGrid API.
-
-    Accepts a `flask_mail.Message` instance or a dict with keys
-    `subject`, `recipients` (list), `body`, and optional `sender`.
-    """
-
     def _send():
         with app.app_context():
             try:
                 sg_api_key = getattr(config, 'SENDGRID_API_KEY', None)
+
                 if not sg_api_key:
-                    app.logger.error('SENDGRID_API_KEY is not configured')
+                    print("No SendGrid API key")
                     return
 
-                # extract fields from Message or dict
                 if isinstance(msg, Message):
-                    subject = getattr(msg, 'subject', '')
-                    recipients = getattr(msg, 'recipients', []) or []
-                    body = getattr(msg, 'body', '') or ''
-                    print("Sending email to:", recipients)
-                    sender = getattr(msg, 'sender', None) or app.config.get('MAIL_DEFAULT_SENDER') or getattr(config, 'SENDGRID_SENDER', None)
-                elif isinstance(msg, dict):
-                    subject = msg.get('subject', '')
-                    recipients = msg.get('recipients', []) or []
-                    body = msg.get('body', '')
-                    sender = msg.get('sender') or app.config.get('MAIL_DEFAULT_SENDER') or getattr(config, 'SENDGRID_SENDER', None)
-                else:
-                    app.logger.error('Unsupported message type for send_email')
-                    return
+                    subject = msg.subject
+                    recipients = msg.recipients
+                    body = msg.body
+                    sender = app.config.get('MAIL_DEFAULT_SENDER')
 
-                if not recipients:
-                    app.logger.error('send_email called without recipients')
-                    return
+                print("Sending email to:", recipients)
 
-                client = SendGridAPIClient(sg_api_key)
                 sg = SendGridAPIClient(sg_api_key)
 
-                email = SGMail(from_email=sender,to_emails=recipients,subject=subject,plain_text_content=body)
+                email = SGMail(
+                    from_email=sender,
+                    to_emails=recipients,
+                    subject=subject,
+                    plain_text_content=body
+                )
 
                 response = sg.send(email)
+                print("Email sent:", response.status_code)
+
             except Exception as e:
-                app.logger.error(f"Email failed: {e}")
+                print("Error sending email:", e)
 
     threading.Thread(target=_send).start()
-
 
 @app.route('/_email-test', methods=['GET'])
 def email_test():
