@@ -15,3 +15,4 @@ python-dotenv==1.1.1
 #   data-science dependencies and were removed for a leaner deployment.
 cloudinary==1.30.0
 sendgrid==6.9.1
+authlib==1.2.0
