@@ -550,8 +550,15 @@ def login_google():
     if not oauth._registry.get('google'):
         flash('Google OAuth not configured.', 'danger')
         return redirect('/user-login')
-    redirect_uri = url_for('auth_google', _external=True)
-    return oauth.google.authorize_redirect(redirect_uri)
+    # Prefer explicit config redirect URI if provided, else use OAUTH_REDIRECT_BASE fallback,
+    # otherwise use url_for to compute external URI.
+    redirect_uri = None
+    if getattr(config, 'GOOGLE_REDIRECT_URI', None):
+        redirect_uri = config.GOOGLE_REDIRECT_URI
+    else:
+        redirect_uri = url_for('auth_google', _external=True)
+    app.logger.info('Google OAuth redirect_uri=%s', redirect_uri)
+    return oauth.google.authorize_redirect(redirect_uri=redirect_uri)
 
 
 @app.route('/auth/google')
@@ -611,8 +618,13 @@ def login_facebook():
     if not oauth._registry.get('facebook'):
         flash('Facebook OAuth not configured.', 'danger')
         return redirect('/user-login')
-    redirect_uri = url_for('auth_facebook', _external=True)
-    return oauth.facebook.authorize_redirect(redirect_uri)
+    redirect_uri = None
+    if getattr(config, 'FACEBOOK_REDIRECT_URI', None):
+        redirect_uri = config.FACEBOOK_REDIRECT_URI
+    else:
+        redirect_uri = url_for('auth_facebook', _external=True)
+    app.logger.info('Facebook OAuth redirect_uri=%s', redirect_uri)
+    return oauth.facebook.authorize_redirect(redirect_uri=redirect_uri)
 
 
 @app.route('/auth/facebook')
