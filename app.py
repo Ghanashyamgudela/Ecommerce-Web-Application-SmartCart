@@ -68,6 +68,8 @@ def fdate_filter(value, fmt='%d %b %Y'):
     return value.strftime(fmt)
 
 app.secret_key = config.SECRET_KEY
+if not app.secret_key:
+    app.logger.warning('SECRET_KEY is not set — session cookies may not be persistent across processes')
 
 # --- OAuth setup (Google, Facebook)
 oauth = OAuth(app)
@@ -558,6 +560,10 @@ def login_google():
         redirect_uri = config.GOOGLE_REDIRECT_URI
     else:
         redirect_uri = url_for('auth_google', _external=True)
+    try:
+        app.logger.debug('session before google authorize: %s', {k: str(v)[:200] for k, v in session.items()})
+    except Exception:
+        app.logger.debug('session before google authorize: <unserializable>')
     app.logger.info('Google OAuth redirect_uri=%s', redirect_uri)
     return oauth.google.authorize_redirect(redirect_uri=redirect_uri)
 
@@ -589,6 +595,7 @@ def auth_google():
             resp = oauth.google.get(userinfo_endpoint)
             app.logger.info('auth_google: userinfo endpoint status=%s', getattr(resp, 'status_code', None))
             userinfo = resp.json()
+        app.logger.info('auth_google: request args=%s', dict(request.args))
         email = userinfo.get('email')
         name = userinfo.get('name') or userinfo.get('given_name') or ''
         if not email:
@@ -601,12 +608,32 @@ def auth_google():
         cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
         user = cursor.fetchone()
         if not user:
-            # create minimal user
+            # create minimal user; use ON CONFLICT to avoid duplicate-key issues
             random_pw = uuid.uuid4().hex
             hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
-            cursor.execute('INSERT INTO users (name, email, password) VALUES (%s,%s,%s) RETURNING user_id', (name, email, hashed))
-            user_id = cursor.fetchone()['user_id']
-            conn.commit()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO users (name, email, password)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+                    RETURNING user_id
+                    """,
+                    (name, email, hashed)
+                )
+                user_id = cursor.fetchone()['user_id']
+                conn.commit()
+            except Exception as db_err:
+                conn.rollback()
+                app.logger.exception('User insert failed, attempting select: %s', db_err)
+                cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+                user = cursor.fetchone()
+                if user:
+                    user_id = user['user_id']
+                else:
+                    conn.close()
+                    flash('Account creation failed. Try again later.', 'danger')
+                    return redirect('/user-login')
             session['user_id'] = user_id
             session['user_name'] = name
             session['user_email'] = email
@@ -639,6 +666,10 @@ def login_facebook():
         redirect_uri = config.FACEBOOK_REDIRECT_URI
     else:
         redirect_uri = url_for('auth_facebook', _external=True)
+    try:
+        app.logger.debug('session before facebook authorize: %s', {k: str(v)[:200] for k, v in session.items()})
+    except Exception:
+        app.logger.debug('session before facebook authorize: <unserializable>')
     app.logger.info('Facebook OAuth redirect_uri=%s', redirect_uri)
     return oauth.facebook.authorize_redirect(redirect_uri=redirect_uri)
 
@@ -665,9 +696,29 @@ def auth_facebook():
         if not user:
             random_pw = uuid.uuid4().hex
             hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
-            cursor.execute('INSERT INTO users (name, email, password) VALUES (%s,%s,%s) RETURNING user_id', (name, email, hashed))
-            user_id = cursor.fetchone()['user_id']
-            conn.commit()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO users (name, email, password)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+                    RETURNING user_id
+                    """,
+                    (name, email, hashed)
+                )
+                user_id = cursor.fetchone()['user_id']
+                conn.commit()
+            except Exception as db_err:
+                conn.rollback()
+                app.logger.exception('User insert failed, attempting select: %s', db_err)
+                cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+                user = cursor.fetchone()
+                if user:
+                    user_id = user['user_id']
+                else:
+                    conn.close()
+                    flash('Account creation failed. Try again later.', 'danger')
+                    return redirect('/user-login')
             session['user_id'] = user_id
             session['user_name'] = name
             session['user_email'] = email
