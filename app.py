@@ -43,10 +43,41 @@ def resolve_image_url(img, folder='product_images'):
     if not img:
         return ''
     try:
+        # normalize to str
+        if not isinstance(img, str):
+            try:
+                img = img.decode() if isinstance(img, (bytes, bytearray)) else str(img)
+            except Exception:
+                img = str(img)
+
+        # strip surrounding whitespace and quotes/brackets
+        img = img.strip()
+        if (img.startswith('"') and img.endswith('"')) or (img.startswith("'") and img.endswith("'")):
+            img = img[1:-1].strip()
+        # if stored as a JSON-like list or joined with ||, pick first candidate
+        if img.startswith('[') and 'http' in img:
+            # attempt to find the first http URL inside
+            import re
+            m = re.search(r'(https?://[^\]\",\']+)', img)
+            if m:
+                return m.group(1)
+        # handle values joined by '||'
+        if '||' in img:
+            img_candidate = img.split('||')[0].strip()
+            if img_candidate:
+                img = img_candidate
+
         if img.startswith('http'):
             return img
+        # handle cases where a dict-like string contains secure_url
+        if 'secure_url' in img and 'http' in img:
+            import re
+            m = re.search(r'https?://[^\s\'\"]+', img)
+            if m:
+                return m.group(0)
     except Exception:
         pass
+    # fallback to local static uploads path
     return url_for('static', filename=f'uploads/{folder}/' + img)
 
 def resolve_admin_image(img):
@@ -83,6 +114,17 @@ if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_
         server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
         client_kwargs={'scope': 'openid email profile'}
     )
+
+    # Register Microsoft (Azure AD / Microsoft Account)
+    if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_CLIENT_SECRET', None):
+        oauth.register(
+            name='microsoft',
+            client_id=config.MICROSOFT_CLIENT_ID,
+            client_secret=config.MICROSOFT_CLIENT_SECRET,
+            authorize_url='https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+            access_token_url='https://login.microsoftonline.com/common/oauth2/v2.0/token',
+            client_kwargs={'scope': 'openid email profile User.Read'}
+        )
 
 # Register Facebook (Graph API)
 if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
@@ -672,6 +714,153 @@ def login_facebook():
         app.logger.debug('session before facebook authorize: <unserializable>')
     app.logger.info('Facebook OAuth redirect_uri=%s', redirect_uri)
     return oauth.facebook.authorize_redirect(redirect_uri=redirect_uri)
+
+
+@app.route('/admin/login/microsoft')
+def admin_login_microsoft():
+    if not oauth._registry.get('microsoft'):
+        flash('Microsoft OAuth not configured.', 'danger')
+        return redirect('/admin-login')
+    # mark intent so callback knows to create an admin request
+    session['oauth_intent'] = 'admin_request'
+    redirect_uri = config.MICROSOFT_REDIRECT_URI if getattr(config, 'MICROSOFT_REDIRECT_URI', None) else url_for('auth_microsoft', _external=True)
+    try:
+        app.logger.debug('session before microsoft authorize: %s', {k: str(v)[:200] for k, v in session.items()})
+    except Exception:
+        app.logger.debug('session before microsoft authorize: <unserializable>')
+    app.logger.info('Microsoft OAuth redirect_uri=%s', redirect_uri)
+    return oauth.microsoft.authorize_redirect(redirect_uri=redirect_uri)
+
+
+@app.route('/login/microsoft')
+def login_microsoft():
+    if not oauth._registry.get('microsoft'):
+        flash('Microsoft OAuth not configured.', 'danger')
+        return redirect('/user-login')
+    # mark intent so callback knows this is a normal user login
+    session['oauth_intent'] = 'user_login'
+    redirect_uri = config.MICROSOFT_REDIRECT_URI if getattr(config, 'MICROSOFT_REDIRECT_URI', None) else url_for('auth_microsoft', _external=True)
+    try:
+        app.logger.debug('session before microsoft authorize (user): %s', {k: str(v)[:200] for k, v in session.items()})
+    except Exception:
+        app.logger.debug('session before microsoft authorize (user): <unserializable>')
+    app.logger.info('Microsoft OAuth redirect_uri=%s', redirect_uri)
+    return oauth.microsoft.authorize_redirect(redirect_uri=redirect_uri)
+
+
+@app.route('/auth/microsoft')
+def auth_microsoft():
+    try:
+        app.logger.info('auth_microsoft: starting token exchange')
+        token = oauth.microsoft.authorize_access_token()
+        app.logger.info('auth_microsoft: token keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
+        # fetch profile from Microsoft Graph
+        resp = oauth.microsoft.get('https://graph.microsoft.com/v1.0/me')
+        app.logger.info('auth_microsoft: profile fetch status=%s', getattr(resp, 'status_code', None))
+        profile = resp.json()
+        # email may be in 'mail' or 'userPrincipalName'
+        email = profile.get('mail') or profile.get('userPrincipalName')
+        name = profile.get('displayName') or ''
+
+        if not email:
+            flash('Microsoft account has no email, cannot continue.', 'danger')
+            return redirect('/admin-signup')
+
+        intent = session.pop('oauth_intent', None)
+        if intent == 'admin_request':
+            # create admin_requests entry (if not exists) and notify super admins
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT request_id FROM admin_requests WHERE email=%s', (email,))
+            existing = cursor.fetchone()
+            if existing:
+                flash('An admin request for this email already exists.', 'info')
+                conn.close()
+                return redirect('/admin-login')
+            try:
+                # store a placeholder password (random) since admin will be approved and set later
+                random_pw = uuid.uuid4().hex
+                hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+                cursor.execute('INSERT INTO admin_requests (name, email, password, status) VALUES (%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending'))
+                req_id = cursor.fetchone()['request_id']
+                conn.commit()
+                # notify super admins
+                try:
+                    cursor.execute("SELECT email FROM admin WHERE is_super_admin=1 AND is_approved=1")
+                    super_admins = cursor.fetchall()
+                    if super_admins:
+                        for sa in super_admins:
+                            msg = Message(
+                                subject="ShopCart — New Admin Registration Request (Microsoft Auth)",
+                                sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')),
+                                recipients=[sa['email']]
+                            )
+                            msg.body = (
+                                f"Hello Super Admin,\n\nA new admin registration request via Microsoft Sign-in is awaiting your approval.\n\nName  : {name}\nEmail : {email}\n\nPlease log in and approve or reject this request: {url_for('admin_login', _external=True)}\n\nRegards,\nShopCart System"
+                            )
+                            send_email(msg)
+                except Exception as mail_err:
+                    app.logger.error('Failed to notify super admin(s): %s', mail_err)
+                conn.close()
+                flash('Admin request submitted! Please wait for super admin approval.', 'success')
+                return redirect('/admin-login')
+            except Exception as e:
+                conn.rollback()
+                conn.close()
+                app.logger.exception('Failed to save admin request: %s', e)
+                flash('Failed to submit admin request. Try again later.', 'danger')
+                return redirect('/admin-signup')
+        else:
+            # default behavior: create/login as normal user
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+            user = cursor.fetchone()
+            if not user:
+                random_pw = uuid.uuid4().hex
+                hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO users (name, email, password)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+                        RETURNING user_id
+                        """,
+                        (name, email, hashed)
+                    )
+                    user_id = cursor.fetchone()['user_id']
+                    conn.commit()
+                except Exception as db_err:
+                    conn.rollback()
+                    app.logger.exception('User insert failed, attempting select: %s', db_err)
+                    cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+                    user = cursor.fetchone()
+                    if user:
+                        user_id = user['user_id']
+                    else:
+                        conn.close()
+                        flash('Account creation failed. Try again later.', 'danger')
+                        return redirect('/user-login')
+                session['user_id'] = user_id
+                session['user_name'] = name
+                session['user_email'] = email
+            else:
+                session['user_id'] = user['user_id']
+                session['user_name'] = user.get('name') or name
+                session['user_email'] = user.get('email')
+            conn.close()
+            flash('Logged in with Microsoft successfully!', 'success')
+            return redirect('/user-dashboard')
+    except Exception as e:
+        app.logger.exception('Microsoft login failed: %s', e)
+        flash(f'Microsoft login failed: {str(e)}', 'danger')
+        return redirect('/admin-login')
+
+
+@app.route('/login/microsoft/callback')
+def auth_microsoft_callback():
+    return auth_microsoft()
 
 
 @app.route('/auth/facebook')
