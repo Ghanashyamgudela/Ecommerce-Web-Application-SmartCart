@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, flash, make_response, jsonify, url_for
-from flask_mail import Mail, Message
+from flask_mail import Message
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail as SGMail
 import psycopg2
 import psycopg2.extras
 import bcrypt
@@ -79,14 +81,45 @@ app.config['MAIL_PASSWORD'] = config.MAIL_PASSWORD
 if getattr(config, 'MAIL_USERNAME', None):
     app.config['MAIL_DEFAULT_SENDER'] = config.MAIL_USERNAME
 
-mail = Mail(app)
 import threading
 
 def send_email(msg):
+    """Send email asynchronously using SendGrid API.
+
+    Accepts a `flask_mail.Message` instance or a dict with keys
+    `subject`, `recipients` (list), `body`, and optional `sender`.
+    """
+
     def _send():
         with app.app_context():
             try:
-                mail.send(msg)
+                sg_api_key = getattr(config, 'SENDGRID_API_KEY', None)
+                if not sg_api_key:
+                    app.logger.error('SENDGRID_API_KEY is not configured')
+                    return
+
+                # extract fields from Message or dict
+                if isinstance(msg, Message):
+                    subject = getattr(msg, 'subject', '')
+                    recipients = getattr(msg, 'recipients', []) or []
+                    body = getattr(msg, 'body', '') or ''
+                    sender = getattr(msg, 'sender', None) or app.config.get('MAIL_DEFAULT_SENDER') or getattr(config, 'SENDGRID_SENDER', None)
+                elif isinstance(msg, dict):
+                    subject = msg.get('subject', '')
+                    recipients = msg.get('recipients', []) or []
+                    body = msg.get('body', '')
+                    sender = msg.get('sender') or app.config.get('MAIL_DEFAULT_SENDER') or getattr(config, 'SENDGRID_SENDER', None)
+                else:
+                    app.logger.error('Unsupported message type for send_email')
+                    return
+
+                if not recipients:
+                    app.logger.error('send_email called without recipients')
+                    return
+
+                client = SendGridAPIClient(sg_api_key)
+                mail = SGMail(from_email=sender, to_emails=recipients, subject=subject, plain_text_content=body)
+                client.send(mail)
             except Exception as e:
                 app.logger.error(f"Email failed: {e}")
 
@@ -104,8 +137,8 @@ def email_test():
     try:
         msg = Message(subject, sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[to])
         msg.body = body
-        # send synchronously so caller gets immediate result
-        mail.send(msg)
+        # use SendGrid wrapper (async)
+        send_email(msg)
         return jsonify({'ok': True, 'message': 'sent'})
     except Exception as e:
         app.logger.exception('Test email failed')
@@ -122,22 +155,18 @@ os.makedirs(ADMIN_UPLOAD_FOLDER, exist_ok=True)
 # MySQL connection is configured in config.py
 def get_db_connection():
 
-    # Prefer explicit DATABASE_URL (e.g., Neon) from env or config
-    database_url = os.getenv("DATABASE_URL") or getattr(config, 'DATABASE_URL', None)
+    database_url = os.getenv("DATABASE_URL")
 
     if database_url:
-        try:
-            # Ensure sslmode is set for Neon/Postgres cloud providers if not provided
-            if 'sslmode' not in database_url.lower():
-                if '?' in database_url:
-                    database_url = database_url + '&sslmode=require'
-                else:
-                    database_url = database_url + '?sslmode=require'
-        except Exception:
-            pass
-
+        # Ensure sslmode is set for Neon/managed Postgres providers
+        dsn = database_url
+        if 'sslmode' not in dsn:
+            if '?' in dsn:
+                dsn = dsn + '&sslmode=require'
+            else:
+                dsn = dsn + '?sslmode=require'
         conn = psycopg2.connect(
-            database_url,
+            dsn,
             cursor_factory=psycopg2.extras.RealDictCursor
         )
     else:
@@ -483,8 +512,8 @@ def admin_forgot_password():
     session['reset_email'] = email
     session['reset_role']  = 'admin'
 
-        try:
-            msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
+    try:
+        msg = Message("ShopCart Password Reset OTP", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[email])
         msg.body = f"Your OTP for ShopCart Admin Password Reset is: {otp}\n\nThis OTP is valid for 10 minutes."
         send_email(msg)
         flash("OTP sent to your email!", "success")
@@ -632,8 +661,8 @@ def approve_request(req_id):
         conn.commit()
         flash(f"Admin '{req['name']}' approved successfully!", "success")
         # send approval email to the newly approved admin
-            try:
-                msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
+        try:
+            msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
             msg.body = (
                 f"Hello {req['name']},\n\n"
                 "Your ShopCart admin account request has been approved by the super admin.\n"
@@ -1896,4 +1925,4 @@ if __name__ == '__main__':
             print("[startup] No admins found — seeding Super Admin...")
             seed_super_admin()
 
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))no
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
