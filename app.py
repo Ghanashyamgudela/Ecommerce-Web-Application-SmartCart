@@ -564,14 +564,19 @@ def login_google():
 @app.route('/auth/google')
 def auth_google():
     try:
+        app.logger.info('auth_google: starting token exchange')
         token = oauth.google.authorize_access_token()
+        app.logger.info('auth_google: token received keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
         userinfo = None
         try:
             # prefer ID token parsing
             userinfo = oauth.google.parse_id_token(token)
-        except Exception:
+            app.logger.info('auth_google: parsed ID token')
+        except Exception as parse_err:
+            app.logger.info('auth_google: ID token parse failed: %s', parse_err)
             # fallback to userinfo endpoint
             resp = oauth.google.get('userinfo')
+            app.logger.info('auth_google: userinfo endpoint status=%s', getattr(resp, 'status_code', None))
             userinfo = resp.json()
         email = userinfo.get('email')
         name = userinfo.get('name') or userinfo.get('given_name') or ''
@@ -602,8 +607,8 @@ def auth_google():
         flash('Logged in with Google successfully!', 'success')
         return redirect('/user-dashboard')
     except Exception as e:
-        app.logger.exception('Google login failed')
-        flash('Google login failed.', 'danger')
+        app.logger.exception('Google login failed: %s', e)
+        flash(f'Google login failed: {str(e)}', 'danger')
         return redirect('/user-login')
 
 
@@ -630,8 +635,11 @@ def login_facebook():
 @app.route('/auth/facebook')
 def auth_facebook():
     try:
+        app.logger.info('auth_facebook: starting token exchange')
         token = oauth.facebook.authorize_access_token()
+        app.logger.info('auth_facebook: token received keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
         resp = oauth.facebook.get('me?fields=id,name,email')
+        app.logger.info('auth_facebook: profile fetch status=%s', getattr(resp, 'status_code', None))
         profile = resp.json()
         email = profile.get('email')
         name = profile.get('name') or ''
@@ -660,9 +668,26 @@ def auth_facebook():
         flash('Logged in with Facebook successfully!', 'success')
         return redirect('/user-dashboard')
     except Exception as e:
-        app.logger.exception('Facebook login failed')
-        flash('Facebook login failed.', 'danger')
+        app.logger.exception('Facebook login failed: %s', e)
+        flash(f'Facebook login failed: {str(e)}', 'danger')
         return redirect('/user-login')
+
+
+@app.route('/debug/oauth')
+def debug_oauth():
+    try:
+        data = {
+            'GOOGLE_REDIRECT_URI': getattr(config, 'GOOGLE_REDIRECT_URI', None),
+            'FACEBOOK_REDIRECT_URI': getattr(config, 'FACEBOOK_REDIRECT_URI', None),
+            'computed_google_callback': url_for('auth_google', _external=True),
+            'computed_facebook_callback': url_for('auth_facebook', _external=True),
+            'google_client_id': getattr(config, 'GOOGLE_CLIENT_ID', None),
+            'facebook_client_id': getattr(config, 'FACEBOOK_CLIENT_ID', None)
+        }
+        return jsonify(data)
+    except Exception as e:
+        app.logger.exception('debug_oauth failed: %s', e)
+        return jsonify({'error': str(e)}), 500
 
 
 # Callback wrapper to support external OAuth redirect URI
