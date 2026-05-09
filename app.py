@@ -19,6 +19,17 @@ import resend
 resend.api_key = os.getenv("RESEND_API_KEY")
 
 app = Flask(__name__)
+def send_email(to, subject, html):
+    try:
+        resend.Emails.send({
+            "from": "onboarding@resend.dev",  # or your verified domain
+            "to": to,
+            "subject": subject,
+            "html": html
+        })
+    except Exception as e:
+        raise Exception(f"Email send failed: {str(e)}")
+
 if config.CLOUDINARY_URL:
     try:
         cloudinary.config(cloudinary_url=config.CLOUDINARY_URL)
