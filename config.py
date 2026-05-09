@@ -48,3 +48,15 @@ SUPER_ADMIN_EMAIL = 'ghana19183@gmail.com'
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 # Optional default sender address for SendGrid (falls back to MAIL_USERNAME)
 SENDGRID_SENDER = os.environ.get("SENDGRID_SENDER")
+
+# =========================================================
+# OAUTH / SOCIAL LOGIN (Google, Facebook)
+# =========================================================
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+FACEBOOK_CLIENT_ID = os.environ.get("FACEBOOK_CLIENT_ID")
+FACEBOOK_CLIENT_SECRET = os.environ.get("FACEBOOK_CLIENT_SECRET")
+
+# Optional redirect hosts if you need to override
+OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE")
