@@ -65,3 +65,10 @@ OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE")
 # derived from `OAUTH_REDIRECT_BASE` when that is provided.
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/google/callback" if OAUTH_REDIRECT_BASE else None)
 FACEBOOK_REDIRECT_URI = os.environ.get("FACEBOOK_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/facebook/callback" if OAUTH_REDIRECT_BASE else None)
+
+# =========================================================
+# MICROSOFT (Azure AD / Microsoft Account)
+# =========================================================
+MICROSOFT_CLIENT_ID = os.environ.get("MICROSOFT_CLIENT_ID")
+MICROSOFT_CLIENT_SECRET = os.environ.get("MICROSOFT_CLIENT_SECRET")
+MICROSOFT_REDIRECT_URI = os.environ.get("MICROSOFT_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/microsoft/callback" if OAUTH_REDIRECT_BASE else None)
