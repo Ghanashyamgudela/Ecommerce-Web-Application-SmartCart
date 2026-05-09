@@ -103,6 +103,7 @@ def send_email(msg):
                     subject = getattr(msg, 'subject', '')
                     recipients = getattr(msg, 'recipients', []) or []
                     body = getattr(msg, 'body', '') or ''
+                    print("Sending email to:", recipients)
                     sender = getattr(msg, 'sender', None) or app.config.get('MAIL_DEFAULT_SENDER') or getattr(config, 'SENDGRID_SENDER', None)
                 elif isinstance(msg, dict):
                     subject = msg.get('subject', '')
@@ -118,8 +119,11 @@ def send_email(msg):
                     return
 
                 client = SendGridAPIClient(sg_api_key)
-                mail = SGMail(from_email=sender, to_emails=recipients, subject=subject, plain_text_content=body)
-                client.send(mail)
+                sg = SendGridAPIClient(sg_api_key)
+
+                email = SGMail(from_email=sender,to_emails=recipients,subject=subject,plain_text_content=body)
+
+response = sg.send(email)
             except Exception as e:
                 app.logger.error(f"Email failed: {e}")
 
