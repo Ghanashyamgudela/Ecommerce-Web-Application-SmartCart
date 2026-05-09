@@ -74,27 +74,9 @@ razorpay_client = razorpay.Client(
 
 
 import threading
-
 @app.route('/_email-test')
 def email_test():
     to = request.args.get('to')
-    if not to:
-        return {"ok": False, "error": "missing to"}, 400
-
-    send_email(
-        to,
-        "Test Email",
-        "<h1>Working 🚀</h1>"
-    )
-
-    return {"ok": True}
-
-
-@app.route('/_email-test', methods=['GET'])
-@app.route('/_email-test')
-def email_test():
-    to = request.args.get('to')
-
     if not to:
         return {"ok": False, "error": "missing to"}, 400
 
