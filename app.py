@@ -16,6 +16,7 @@ from utils.pdf_generator import generate_pdf
 from datetime import datetime
 import cloudinary
 import cloudinary.uploader
+from authlib.integrations.flask_client import OAuth
 
 
 app = Flask(__name__)
@@ -67,6 +68,31 @@ def fdate_filter(value, fmt='%d %b %Y'):
     return value.strftime(fmt)
 
 app.secret_key = config.SECRET_KEY
+
+# --- OAuth setup (Google, Facebook)
+oauth = OAuth(app)
+
+# Register Google using OIDC discovery
+if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_SECRET', None):
+    oauth.register(
+        name='google',
+        client_id=config.GOOGLE_CLIENT_ID,
+        client_secret=config.GOOGLE_CLIENT_SECRET,
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={'scope': 'openid email profile'}
+    )
+
+# Register Facebook (Graph API)
+if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
+    oauth.register(
+        name='facebook',
+        client_id=config.FACEBOOK_CLIENT_ID,
+        client_secret=config.FACEBOOK_CLIENT_SECRET,
+        api_base_url='https://graph.facebook.com/',
+        access_token_url='https://graph.facebook.com/v12.0/oauth/access_token',
+        authorize_url='https://www.facebook.com/v12.0/dialog/oauth',
+        client_kwargs={'scope': 'email public_profile'},
+    )
 
 razorpay_client = razorpay.Client(
     auth=(config.RAZORPAY_KEY_ID, config.RAZORPAY_KEY_SECRET)
@@ -514,6 +540,124 @@ def admin_forgot_password():
         return redirect('/admin-forgot-password')
 
     return redirect('/admin-reset-password')
+
+
+# -----------------------------
+# Social login routes
+# -----------------------------
+@app.route('/login/google')
+def login_google():
+    if not oauth._registry.get('google'):
+        flash('Google OAuth not configured.', 'danger')
+        return redirect('/user-login')
+    redirect_uri = url_for('auth_google', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/google')
+def auth_google():
+    try:
+        token = oauth.google.authorize_access_token()
+        userinfo = None
+        try:
+            # prefer ID token parsing
+            userinfo = oauth.google.parse_id_token(token)
+        except Exception:
+            # fallback to userinfo endpoint
+            resp = oauth.google.get('userinfo')
+            userinfo = resp.json()
+        email = userinfo.get('email')
+        name = userinfo.get('name') or userinfo.get('given_name') or ''
+        if not email:
+            flash('Google account has no email, cannot continue.', 'danger')
+            return redirect('/user-login')
+
+        # find or create user
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cursor.fetchone()
+        if not user:
+            # create minimal user
+            random_pw = uuid.uuid4().hex
+            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+            cursor.execute('INSERT INTO users (name, email, password) VALUES (%s,%s,%s) RETURNING user_id', (name, email, hashed))
+            user_id = cursor.fetchone()['user_id']
+            conn.commit()
+            session['user_id'] = user_id
+            session['user_name'] = name
+            session['user_email'] = email
+        else:
+            session['user_id'] = user['user_id']
+            session['user_name'] = user.get('name') or name
+            session['user_email'] = user.get('email')
+        conn.close()
+        flash('Logged in with Google successfully!', 'success')
+        return redirect('/user-dashboard')
+    except Exception as e:
+        app.logger.exception('Google login failed')
+        flash('Google login failed.', 'danger')
+        return redirect('/user-login')
+
+
+# Callback wrapper to support external OAuth redirect URI
+@app.route('/login/google/callback')
+def auth_google_callback():
+    return auth_google()
+
+
+@app.route('/login/facebook')
+def login_facebook():
+    if not oauth._registry.get('facebook'):
+        flash('Facebook OAuth not configured.', 'danger')
+        return redirect('/user-login')
+    redirect_uri = url_for('auth_facebook', _external=True)
+    return oauth.facebook.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/facebook')
+def auth_facebook():
+    try:
+        token = oauth.facebook.authorize_access_token()
+        resp = oauth.facebook.get('me?fields=id,name,email')
+        profile = resp.json()
+        email = profile.get('email')
+        name = profile.get('name') or ''
+        if not email:
+            flash('Facebook account did not provide email. Use another sign-in method.', 'danger')
+            return redirect('/user-login')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cursor.fetchone()
+        if not user:
+            random_pw = uuid.uuid4().hex
+            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+            cursor.execute('INSERT INTO users (name, email, password) VALUES (%s,%s,%s) RETURNING user_id', (name, email, hashed))
+            user_id = cursor.fetchone()['user_id']
+            conn.commit()
+            session['user_id'] = user_id
+            session['user_name'] = name
+            session['user_email'] = email
+        else:
+            session['user_id'] = user['user_id']
+            session['user_name'] = user.get('name') or name
+            session['user_email'] = user.get('email')
+        conn.close()
+        flash('Logged in with Facebook successfully!', 'success')
+        return redirect('/user-dashboard')
+    except Exception as e:
+        app.logger.exception('Facebook login failed')
+        flash('Facebook login failed.', 'danger')
+        return redirect('/user-login')
+
+
+# Callback wrapper to support external OAuth redirect URI
+@app.route('/login/facebook/callback')
+def auth_facebook_callback():
+    return auth_facebook()
+
 
 
 @app.route('/admin-reset-password', methods=['GET', 'POST'])
