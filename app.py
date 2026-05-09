@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, redirect, session, flash, make_response, jsonify, url_for
-from flask_mail import Mail, Message
 import psycopg2
 import psycopg2.extras
 import bcrypt
@@ -73,27 +72,22 @@ razorpay_client = razorpay.Client(
     auth=(config.RAZORPAY_KEY_ID, config.RAZORPAY_KEY_SECRET)
 )
 
-app.config['MAIL_SERVER'] = config.MAIL_SERVER
-app.config['MAIL_PORT'] = config.MAIL_PORT
-app.config['MAIL_USE_TLS'] = config.MAIL_USE_TLS
-app.config['MAIL_USE_SSL'] = config.MAIL_USE_SSL
-app.config['MAIL_USERNAME'] = config.MAIL_USERNAME
-app.config['MAIL_PASSWORD'] = config.MAIL_PASSWORD
-if getattr(config, 'MAIL_USERNAME', None):
-    app.config['MAIL_DEFAULT_SENDER'] = config.MAIL_USERNAME
 
 import threading
 
-def send_email(to, subject, html):
-    try:
-        resend.Emails.send({
-            "from": config.RESEND_FROM_EMAIL,
-            "to": [to],   # IMPORTANT → must be list
-            "subject": subject,
-            "html": html
-        })
-    except Exception as e:
-        print("Email failed:", e)
+@app.route('/_email-test')
+def email_test():
+    to = request.args.get('to')
+    if not to:
+        return {"ok": False, "error": "missing to"}, 400
+
+    send_email(
+        to,
+        "Test Email",
+        "<h1>Working 🚀</h1>"
+    )
+
+    return {"ok": True}
 
 
 @app.route('/_email-test', methods=['GET'])
