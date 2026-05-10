@@ -888,7 +888,12 @@ def auth_microsoft():
     except Exception as e:
         app.logger.exception('Microsoft login failed: %s', e)
         flash(f'Microsoft login failed: {str(e)}', 'danger')
-        return redirect('/admin-login')
+        # Redirect according to original intent (admin_request vs user_login).
+        intent = session.pop('oauth_intent', None) or session.get('oauth_intent')
+        if intent == 'admin_request':
+            return redirect('/admin-login')
+        else:
+            return redirect('/user-login')
 
 
 @app.route('/login/microsoft/callback')
