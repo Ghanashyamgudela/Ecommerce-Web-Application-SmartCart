@@ -135,7 +135,7 @@
             flex: 1;
             padding: 0.65rem;
             border-radius: 4px;
-            font-weight: 700;
+        
             cursor: pointer;
             border: none;
             color: white;
@@ -144,6 +144,7 @@
             justify-content: center;
             gap: 0.5rem;
             text-decoration: none;
+            margin-top:inherit;
         }
 
         .btn-google { background: #db4437; }
@@ -167,6 +168,7 @@
 
         .divider::before {
             left: 0;
+            width:33%;
         }
 
         .divider::after {
@@ -178,6 +180,8 @@
             padding: 0 0.5rem;
             color: #666;
             font-size: 0.8rem;
+            border:2px solid white;
+            border-radius:2px;
         }
 
         .register-section {
@@ -288,9 +292,9 @@
 
             <div class="divider" style="margin-top:1rem"><span>or continue with</span></div>
             <div class="social-row">
-                <a class="btn-social btn-google" href="/login/google"> <i class="fa-brands fa-google"></i>Sign in with Google</a>
-                <a class="btn-social btn-facebook" href="/login/facebook"><i class="fa-brands fa-facebook"></i>Sign in with Facebook</a>
-                <a class="btn-social" href="/login/microsoft" style="background:#2F2F6A;"><i class="fa-brands fa-microsoft" style="color: rgb(255, 212, 59);"></i>Sign in with Microsoft</a>
+                <a class="btn-social btn-google" href="/login/google"> <i class="fa-brands fa-google"></i></a>
+                <a class="btn-social btn-facebook" href="/login/facebook"><i class="fa-brands fa-facebook"></i></a>
+                <a class="btn-social" href="/login/microsoft" style="background:#2F2F6A;"><i class="fa-brands fa-microsoft" style="color: rgb(255, 212, 59);"></i></a>
             </div>
 
             <div class="register-section">
