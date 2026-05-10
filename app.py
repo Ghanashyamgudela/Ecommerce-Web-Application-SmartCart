@@ -795,32 +795,48 @@ def auth_microsoft():
             token = oauth.microsoft.authorize_access_token()
         except InvalidClaimError as ice:
             app.logger.warning('auth_microsoft: ID token iss validation failed: %s', ice)
-            # Attempt manual token exchange and use Graph API to get profile
+            # First attempt: ask Authlib to parse without requiring `iss` claim
             try:
-                code = request.args.get('code')
-                redirect_uri = config.MICROSOFT_REDIRECT_URI if getattr(config, 'MICROSOFT_REDIRECT_URI', None) else url_for('auth_microsoft', _external=True)
-                metadata = getattr(oauth.microsoft, 'server_metadata', None) or {}
-                token_endpoint = metadata.get('token_endpoint') or 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
-                data = {
-                    'client_id': config.MICROSOFT_CLIENT_ID,
-                    'client_secret': config.MICROSOFT_CLIENT_SECRET,
-                    'grant_type': 'authorization_code',
-                    'code': code,
-                    'redirect_uri': redirect_uri,
-                }
-                app.logger.info('auth_microsoft: performing manual token exchange at %s', token_endpoint)
-                resp = requests.post(token_endpoint, data=data, headers={'Accept': 'application/json'})
-                resp.raise_for_status()
-                token = resp.json()
-                access_token = token.get('access_token')
-                if access_token:
-                    g = requests.get('https://graph.microsoft.com/v1.0/me', headers={'Authorization': f'Bearer {access_token}'})
-                    if g.status_code == 200:
-                        manual_profile = g.json()
-                        app.logger.info('auth_microsoft: fetched profile via Graph after manual token exchange')
-            except Exception as e2:
-                app.logger.exception('auth_microsoft: manual token exchange/graph fetch failed: %s', e2)
-                raise
+                token = oauth.microsoft.authorize_access_token(claims_options={'iss': {'essential': False}})
+                app.logger.info('auth_microsoft: successfully parsed token with relaxed iss validation')
+            except Exception as retry_err:
+                app.logger.warning('auth_microsoft: relaxed parse failed: %s', retry_err)
+                # Fallback: manual token exchange using authorization code. Include any
+                # stored PKCE `code_verifier` if present in session to satisfy token endpoint.
+                try:
+                    code = request.args.get('code')
+                    redirect_uri = config.MICROSOFT_REDIRECT_URI if getattr(config, 'MICROSOFT_REDIRECT_URI', None) else url_for('auth_microsoft', _external=True)
+                    metadata = getattr(oauth.microsoft, 'server_metadata', None) or {}
+                    token_endpoint = metadata.get('token_endpoint') or 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+                    code_verifier = None
+                    # check common session keys where PKCE verifier might be stored
+                    for k in ('code_verifier', 'oauth_code_verifier', 'microsoft_code_verifier', 'authlib_code_verifier'):
+                        if session.get(k):
+                            code_verifier = session.get(k)
+                            break
+                    data = {
+                        'client_id': config.MICROSOFT_CLIENT_ID,
+                        'client_secret': config.MICROSOFT_CLIENT_SECRET,
+                        'grant_type': 'authorization_code',
+                        'code': code,
+                        'redirect_uri': redirect_uri,
+                    }
+                    if code_verifier:
+                        data['code_verifier'] = code_verifier
+                        app.logger.info('auth_microsoft: using stored code_verifier for manual token exchange')
+                    app.logger.info('auth_microsoft: performing manual token exchange at %s', token_endpoint)
+                    resp = requests.post(token_endpoint, data=data, headers={'Accept': 'application/json'})
+                    resp.raise_for_status()
+                    token = resp.json()
+                    access_token = token.get('access_token')
+                    if access_token:
+                        g = requests.get('https://graph.microsoft.com/v1.0/me', headers={'Authorization': f'Bearer {access_token}'})
+                        if g.status_code == 200:
+                            manual_profile = g.json()
+                            app.logger.info('auth_microsoft: fetched profile via Graph after manual token exchange')
+                except Exception as e2:
+                    app.logger.exception('auth_microsoft: manual token exchange/graph fetch failed: %s', e2)
+                    raise
         app.logger.info('auth_microsoft: token keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
         # fetch profile using OIDC userinfo endpoint (preferred)
         profile = None
