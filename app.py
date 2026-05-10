@@ -17,6 +17,8 @@ from datetime import datetime
 import cloudinary
 import cloudinary.uploader
 from authlib.integrations.flask_client import OAuth
+from authlib.jose.errors import InvalidClaimError
+import requests
 import pyotp
 import qrcode
 import base64
@@ -120,16 +122,22 @@ if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_
     )
 
     # Register Microsoft (Azure AD / Microsoft Account)
-    if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_CLIENT_SECRET', None):
-        oauth.register(
-            name='microsoft',
-            client_id=config.MICROSOFT_CLIENT_ID,
-            client_secret=config.MICROSOFT_CLIENT_SECRET,
-            server_metadata_url='https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-    client_kwargs={
-        'scope': 'openid email profile'
-    }
-)
+if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_CLIENT_SECRET', None):
+    # Prefer tenant-specific discovery when MICROSOFT_TENANT_ID is set to avoid
+    # issuer (iss) mismatch errors from Azure AD. Fall back to `common` otherwise.
+    tenant = getattr(config, 'MICROSOFT_TENANT_ID', None)
+    if tenant:
+        server_metadata = f"https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
+    else:
+        server_metadata = 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration'
+
+    oauth.register(
+        name='microsoft',
+        client_id=config.MICROSOFT_CLIENT_ID,
+        client_secret=config.MICROSOFT_CLIENT_SECRET,
+        server_metadata_url=server_metadata,
+        client_kwargs={'scope': 'openid email profile'}
+    )
 # Register Facebook (Graph API)
 if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
     oauth.register(
@@ -782,23 +790,56 @@ def login_microsoft():
 def auth_microsoft():
     try:
         app.logger.info('auth_microsoft: starting token exchange')
-        token = oauth.microsoft.authorize_access_token()
+        manual_profile = None
+        try:
+            token = oauth.microsoft.authorize_access_token()
+        except InvalidClaimError as ice:
+            app.logger.warning('auth_microsoft: ID token iss validation failed: %s', ice)
+            # Attempt manual token exchange and use Graph API to get profile
+            try:
+                code = request.args.get('code')
+                redirect_uri = config.MICROSOFT_REDIRECT_URI if getattr(config, 'MICROSOFT_REDIRECT_URI', None) else url_for('auth_microsoft', _external=True)
+                metadata = getattr(oauth.microsoft, 'server_metadata', None) or {}
+                token_endpoint = metadata.get('token_endpoint') or 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+                data = {
+                    'client_id': config.MICROSOFT_CLIENT_ID,
+                    'client_secret': config.MICROSOFT_CLIENT_SECRET,
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': redirect_uri,
+                }
+                app.logger.info('auth_microsoft: performing manual token exchange at %s', token_endpoint)
+                resp = requests.post(token_endpoint, data=data, headers={'Accept': 'application/json'})
+                resp.raise_for_status()
+                token = resp.json()
+                access_token = token.get('access_token')
+                if access_token:
+                    g = requests.get('https://graph.microsoft.com/v1.0/me', headers={'Authorization': f'Bearer {access_token}'})
+                    if g.status_code == 200:
+                        manual_profile = g.json()
+                        app.logger.info('auth_microsoft: fetched profile via Graph after manual token exchange')
+            except Exception as e2:
+                app.logger.exception('auth_microsoft: manual token exchange/graph fetch failed: %s', e2)
+                raise
         app.logger.info('auth_microsoft: token keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
         # fetch profile using OIDC userinfo endpoint (preferred)
         profile = None
-        try:
-            resp = oauth.microsoft.get('userinfo')
-            app.logger.info('auth_microsoft: userinfo status=%s', getattr(resp, 'status_code', None))
-            profile = resp.json()
-        except Exception as e:
-            app.logger.info('auth_microsoft: userinfo fetch failed, falling back to Graph /me: %s', e)
+        if manual_profile is not None:
+            profile = manual_profile
+        else:
             try:
-                resp = oauth.microsoft.get('https://graph.microsoft.com/v1.0/me')
-                app.logger.info('auth_microsoft: graph /me status=%s', getattr(resp, 'status_code', None))
+                resp = oauth.microsoft.get('userinfo')
+                app.logger.info('auth_microsoft: userinfo status=%s', getattr(resp, 'status_code', None))
                 profile = resp.json()
-            except Exception as e2:
-                app.logger.exception('auth_microsoft: failed to fetch profile from Microsoft: %s', e2)
-                profile = {}
+            except Exception as e:
+                app.logger.info('auth_microsoft: userinfo fetch failed, falling back to Graph /me: %s', e)
+                try:
+                    resp = oauth.microsoft.get('https://graph.microsoft.com/v1.0/me')
+                    app.logger.info('auth_microsoft: graph /me status=%s', getattr(resp, 'status_code', None))
+                    profile = resp.json()
+                except Exception as e2:
+                    app.logger.exception('auth_microsoft: failed to fetch profile from Microsoft: %s', e2)
+                    profile = {}
         # email may be in 'mail' or 'userPrincipalName'
         email = profile.get('mail') or profile.get('userPrincipalName')
         name = profile.get('displayName') or ''
