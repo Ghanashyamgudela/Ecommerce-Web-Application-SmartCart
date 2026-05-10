@@ -147,8 +147,8 @@ if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLI
         api_base_url='https://graph.facebook.com/',
         access_token_url='https://graph.facebook.com/v12.0/oauth/access_token',
         authorize_url='https://www.facebook.com/v12.0/dialog/oauth',
-        # Use comma-separated scopes for Facebook to avoid scope parsing issues.
-        client_kwargs={'scope': 'email,public_profile'},
+        # Request valid Facebook scopes. Use space-separated scopes for FB.
+        client_kwargs={'scope': 'email public_profile'},
     )
 
 razorpay_client = razorpay.Client(
@@ -979,8 +979,20 @@ def auth_facebook():
         app.logger.info('auth_facebook: starting token exchange')
         token = oauth.facebook.authorize_access_token()
         app.logger.info('auth_facebook: token received keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
+        try:
+            has_at = bool(token.get('access_token')) if isinstance(token, dict) else False
+        except Exception:
+            has_at = False
+        app.logger.info('auth_facebook: has_access_token=%s', has_at)
         resp = oauth.facebook.get('me?fields=id,name,email')
         app.logger.info('auth_facebook: profile fetch status=%s', getattr(resp, 'status_code', None))
+        if getattr(resp, 'status_code', None) != 200:
+            try:
+                app.logger.error('auth_facebook: profile fetch body=%s', resp.text)
+            except Exception:
+                pass
+            flash('Facebook profile fetch failed. Check app permissions or logs.', 'danger')
+            return redirect('/user-login')
         profile = resp.json()
         email = profile.get('email')
         name = profile.get('name') or ''
