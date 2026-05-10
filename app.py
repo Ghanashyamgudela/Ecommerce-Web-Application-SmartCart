@@ -120,12 +120,12 @@ if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_
     )
 
     # Register Microsoft (Azure AD / Microsoft Account)
-    if os.getenv("MICROSOFT_CLIENT_ID") and os.getenv("MICROSOFT_CLIENT_SECRET"):
+    if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_CLIENT_SECRET', None):
         oauth.register(
-    name='microsoft',
-    client_id=MICROSOFT_CLIENT_ID,
-    client_secret=MICROSOFT_CLIENT_SECRET,
-    server_metadata_url='https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+            name='microsoft',
+            client_id=config.MICROSOFT_CLIENT_ID,
+            client_secret=config.MICROSOFT_CLIENT_SECRET,
+            server_metadata_url='https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
     client_kwargs={
         'scope': 'openid email profile'
     }
