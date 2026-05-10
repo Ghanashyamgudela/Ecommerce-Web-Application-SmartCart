@@ -32,7 +32,7 @@
             (function(){
                 {% set js_imgs = [] %}
                 {% for im in imgs %}
-                    {% do js_imgs.append(resolve_image_url(im)) %}
+                    {% set _ = js_imgs.append(resolve_image_url(im)) %}
                 {% endfor %}
                 var imgs = {{ js_imgs | tojson | safe }};
                 var idx = 0;
