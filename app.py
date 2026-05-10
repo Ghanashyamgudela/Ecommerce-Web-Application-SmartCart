@@ -977,6 +977,13 @@ def auth_microsoft_callback():
 def auth_facebook():
     try:
         app.logger.info('auth_facebook: starting token exchange')
+        # Facebook may return an error in the callback (e.g. invalid scopes).
+        # If so, handle it gracefully instead of calling authorize_access_token().
+        if 'error' in request.args or 'error_code' in request.args or 'error_message' in request.args:
+            app.logger.error('auth_facebook: callback error params=%s', dict(request.args))
+            err_msg = request.args.get('error_description') or request.args.get('error_message') or request.args.get('error') or request.args.get('error_code')
+            flash(f'Facebook login failed: {err_msg}', 'danger')
+            return redirect('/user-login')
         token = oauth.facebook.authorize_access_token()
         app.logger.info('auth_facebook: token received keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
         try:
