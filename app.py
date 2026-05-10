@@ -125,8 +125,7 @@ if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_
             name='microsoft',
             client_id=config.MICROSOFT_CLIENT_ID,
             client_secret=config.MICROSOFT_CLIENT_SECRET,
-            authorize_url='https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-            access_token_url='https://login.microsoftonline.com/common/oauth2/v2.0/token',
+            server_metadata_url='https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
             client_kwargs={'scope': 'openid email profile User.Read'}
         )
 
