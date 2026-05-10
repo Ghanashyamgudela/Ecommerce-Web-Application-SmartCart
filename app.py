@@ -122,15 +122,14 @@ if getattr(config, 'GOOGLE_CLIENT_ID', None) and getattr(config, 'GOOGLE_CLIENT_
     # Register Microsoft (Azure AD / Microsoft Account)
     if os.getenv("MICROSOFT_CLIENT_ID") and os.getenv("MICROSOFT_CLIENT_SECRET"):
         oauth.register(
-            name='microsoft',
-            client_id=os.getenv("MICROSOFT_CLIENT_ID"),
-            client_secret=os.getenv("MICROSOFT_CLIENT_SECRET"),
-            server_metadata_url="https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration",
-            client_kwargs={
-                "scope": "openid email profile"
-            }
-        )
-
+    name='microsoft',
+    client_id=MICROSOFT_CLIENT_ID,
+    client_secret=MICROSOFT_CLIENT_SECRET,
+    server_metadata_url='https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
+)
 # Register Facebook (Graph API)
 if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
     oauth.register(
@@ -785,10 +784,21 @@ def auth_microsoft():
         app.logger.info('auth_microsoft: starting token exchange')
         token = oauth.microsoft.authorize_access_token()
         app.logger.info('auth_microsoft: token keys=%s', list(token.keys()) if isinstance(token, dict) else str(type(token)))
-        # fetch profile from Microsoft Graph
-        resp = oauth.microsoft.get('https://graph.microsoft.com/v1.0/me')
-        app.logger.info('auth_microsoft: profile fetch status=%s', getattr(resp, 'status_code', None))
-        profile = resp.json()
+        # fetch profile using OIDC userinfo endpoint (preferred)
+        profile = None
+        try:
+            resp = oauth.microsoft.get('userinfo')
+            app.logger.info('auth_microsoft: userinfo status=%s', getattr(resp, 'status_code', None))
+            profile = resp.json()
+        except Exception as e:
+            app.logger.info('auth_microsoft: userinfo fetch failed, falling back to Graph /me: %s', e)
+            try:
+                resp = oauth.microsoft.get('https://graph.microsoft.com/v1.0/me')
+                app.logger.info('auth_microsoft: graph /me status=%s', getattr(resp, 'status_code', None))
+                profile = resp.json()
+            except Exception as e2:
+                app.logger.exception('auth_microsoft: failed to fetch profile from Microsoft: %s', e2)
+                profile = {}
         # email may be in 'mail' or 'userPrincipalName'
         email = profile.get('mail') or profile.get('userPrincipalName')
         name = profile.get('displayName') or ''
