@@ -136,7 +136,7 @@ if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_C
         client_id=config.MICROSOFT_CLIENT_ID,
         client_secret=config.MICROSOFT_CLIENT_SECRET,
         server_metadata_url=server_metadata,
-        client_kwargs={'scope': 'openid email profile'}
+        client_kwargs={'scope': 'email public_profile'}
     )
 # Register Facebook (Graph API)
 if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
