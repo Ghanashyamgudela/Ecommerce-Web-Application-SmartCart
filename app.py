@@ -136,7 +136,7 @@ if getattr(config, 'MICROSOFT_CLIENT_ID', None) and getattr(config, 'MICROSOFT_C
         client_id=config.MICROSOFT_CLIENT_ID,
         client_secret=config.MICROSOFT_CLIENT_SECRET,
         server_metadata_url=server_metadata,
-        client_kwargs={'scope': 'email public_profile'}
+        client_kwargs={'scope': 'openid email public_profile'}
     )
 # Register Facebook (Graph API)
 if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLIENT_SECRET', None):
@@ -148,7 +148,7 @@ if getattr(config, 'FACEBOOK_CLIENT_ID', None) and getattr(config, 'FACEBOOK_CLI
         access_token_url='https://graph.facebook.com/v12.0/oauth/access_token',
         authorize_url='https://www.facebook.com/v12.0/dialog/oauth',
         # Request valid Facebook scopes. Use space-separated scopes for FB.
-        client_kwargs={'scope': 'email public_profile'},
+        client_kwargs={'scope': ' public_profile'},
     )
 
 razorpay_client = razorpay.Client(
