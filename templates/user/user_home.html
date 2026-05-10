@@ -441,8 +441,7 @@
                 {% for product in featured_products %}
                 <div class="product-card" onclick="window.location='/user/product/{{ product.product_id }}'">
                     <div class="product-card-img-wrap">
-                        <img src="/static/uploads/product_images/{{ (product.image.split('||')[0] if product.image else '') }}" class="product-card-img"
-                            alt="{{ product.name }}" loading="lazy">
+                        <img src="{{ product.image.split('||')[0] if product.image else '' }}">
                     </div>
                     <div class="product-card-body">
                         <div class="product-card-name">{{ product.name }}</div>
