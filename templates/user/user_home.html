@@ -442,7 +442,7 @@
                 <div class="product-card" onclick="window.location='/user/product/{{ product.product_id }}'">
                     <div class="product-card-img-wrap">
                         <img src="{{ product.image.split('||')[0] if product.image else '' }}"class="product-card-img"
-                            alt="{{ product.name }}" loading="lazy">>
+                            alt="{{ product.name }}" loading="lazy">
                     </div>
                     <div class="product-card-body">
                         <div class="product-card-name">{{ product.name }}</div>
