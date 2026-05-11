@@ -9,6 +9,27 @@ import random
 import config
 import os
 from werkzeug.utils import secure_filename
+import requests
+
+# Telegram settings (can be set via config or environment)
+BOT_TOKEN = getattr(config, 'TELEGRAM_BOT_TOKEN', 'YOUR_BOT_TOKEN')   
+DEFAULT_TELEGRAM_CHAT_ID = getattr(config, 'TELEGRAM_CHAT_ID', 'YOUR_CHAT_ID')
+
+def send_telegram_message(chat_id_or_none, message):
+    try:
+        chat_id = chat_id_or_none or DEFAULT_TELEGRAM_CHAT_ID
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": chat_id,
+            "text": message
+        }
+        # fire-and-forget; short timeout so it doesn't hang the request
+        requests.post(url, data=data, timeout=5)
+    except Exception as e:
+        try:
+            app.logger.exception('Failed to send Telegram message: %s', e)
+        except Exception:
+            pass
 import razorpay
 import traceback
 import uuid
@@ -1258,6 +1279,18 @@ def approve_request(req_id):
         except Exception as e:
             # don't block the flow on mail errors; notify the super admin
             flash(f"Approved but failed to send email: {str(e)}", "warning")
+        # Send Telegram notification to the admin (uses DEFAULT_TELEGRAM_CHAT_ID if none provided)
+        try:
+            telegram_msg = (
+                f"Hello {req['name']},\n\n"
+                f"Your ShopCart admin account has been approved. You can now sign in: {url_for('admin_login', _external=True)}\n\n"
+                "Regards,\nShopCart Team"
+            )
+            # If admin record contains a chat id in `req['telegram_chat_id']`, use it; otherwise default
+            send_telegram_message(req.get('telegram_chat_id') if isinstance(req, dict) else None, telegram_msg)
+        except Exception as te:
+            app.logger.exception('Failed to send Telegram notification: %s', te)
+            flash('Approved but failed to send Telegram notification.', 'warning')
     except Exception as e:
         flash(f"Error: {e}", "danger")
     finally:
