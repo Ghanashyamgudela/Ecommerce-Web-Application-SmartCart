@@ -1418,11 +1418,20 @@ def approve_request(req_id):
         try:
             telegram_msg = (
                 f"Hello {req['name']},\n\n"
-                f"Your ShopCart admin account has been approved. You can now sign in: {url_for('admin_login', _external=True)}\n\n"
+                f"Your ShopCart admin account has been approved.\n"
+                f"Email: {req.get('email') or 'N/A'}\n"
+                f"Phone: {req.get('phone') or 'N/A'}\n\n"
+                f"You can now sign in: {url_for('admin_login', _external=True)}\n\n"
                 "Regards,\nShopCart Team"
             )
             # If admin record contains a chat id in `req['telegram_chat_id']`, use it; otherwise default
-            send_telegram_message(req.get('telegram_chat_id') if isinstance(req, dict) else None, telegram_msg)
+            chat_id_to_use = None
+            try:
+                if isinstance(req, dict):
+                    chat_id_to_use = req.get('telegram_chat_id')
+            except Exception:
+                chat_id_to_use = None
+            send_telegram_message(chat_id_to_use, telegram_msg)
         except Exception as te:
             app.logger.exception('Failed to send Telegram notification: %s', te)
             flash('Approved but failed to send Telegram notification.', 'warning')
