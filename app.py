@@ -270,6 +270,7 @@ def init_db():
             email VARCHAR(255) UNIQUE NOT NULL,
             password TEXT NOT NULL,
             profile_image VARCHAR(255),
+            phone VARCHAR(50),
             is_approved BOOLEAN DEFAULT FALSE,
             is_super_admin BOOLEAN DEFAULT FALSE
         );
@@ -346,6 +347,8 @@ def init_db():
         "ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity INT DEFAULT 0",
         "ALTER TABLE products ADD COLUMN IF NOT EXISTS added_by_admin INT DEFAULT NULL",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image TEXT",
+        "ALTER TABLE admin_requests ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
+        "ALTER TABLE admin ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
     ]:
         try:
             cursor.execute(col_sql)
@@ -385,6 +388,7 @@ def admin_signup():
 
     name  = request.form['name']
     email = request.form['email']
+    phone = request.form.get('phone', '').strip()
 
     conn   = get_db_connection()
     cursor = conn.cursor()
@@ -406,6 +410,7 @@ def admin_signup():
     # Use Microsoft Authenticator (TOTP) flow: generate a secret and show a QR
     session['signup_name']  = name
     session['signup_email'] = email
+    session['signup_phone'] = phone
     # generate TOTP secret and provisioning URI for authenticator apps
     secret = pyotp.random_base32()
     session['mfa_secret'] = secret
@@ -460,6 +465,7 @@ def verify_otp_post():
 
     requester_name  = session.get('signup_name', '')
     requester_email = session.get('signup_email', '')
+    requester_phone = session.get('signup_phone', '')
 
     conn   = get_db_connection()
     cursor = conn.cursor()
@@ -491,13 +497,13 @@ def verify_otp_post():
 
             if existing_rejected:
                 cursor.execute(
-                    "UPDATE admin_requests SET name=%s, password=%s, status='pending', created_at=CURRENT_TIMESTAMP WHERE email=%s",
-                    (requester_name, hashed, requester_email)
+                    "UPDATE admin_requests SET name=%s, password=%s, phone=%s, status='pending', created_at=CURRENT_TIMESTAMP WHERE email=%s",
+                    (requester_name, hashed, requester_phone, requester_email)
                 )
             else:
                 cursor.execute(
-                    "INSERT INTO admin_requests (name, email, password) VALUES (%s,%s,%s)",
-                    (requester_name, requester_email, hashed)
+                    "INSERT INTO admin_requests (name, email, password, phone) VALUES (%s,%s,%s,%s)",
+                    (requester_name, requester_email, hashed, requester_phone)
                 )
             conn.commit()
         except Exception as e:
@@ -524,6 +530,7 @@ def verify_otp_post():
                             f"A new admin registration request is awaiting your approval.\n\n"
                             f"Name  : {requester_name}\n"
                             f"Email : {requester_email}\n\n"
+                            f"Phone : {requester_phone or 'N/A'}\n\n"
                             f"Please log in to the ShopCart Admin Panel and go to\n"
                             f"'Admin Requests' to approve or reject this request.\n\n"
                             f"Login URL : {url_for('admin_login', _external=True)}\n\n"
@@ -537,7 +544,7 @@ def verify_otp_post():
             except Exception:
                 pass
 
-        for k in ['otp', 'signup_name', 'signup_email', 'otp_purpose']:
+        for k in ['otp', 'signup_name', 'signup_email', 'signup_phone', 'otp_purpose']:
             session.pop(k, None)
         flash("Registration request submitted! Please wait for super admin approval.", "info")
         return redirect('/admin-login')
@@ -884,7 +891,7 @@ def auth_microsoft():
                 # store a placeholder password (random) since admin will be approved and set later
                 random_pw = uuid.uuid4().hex
                 hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
-                cursor.execute('INSERT INTO admin_requests (name, email, password, status) VALUES (%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending'))
+                cursor.execute('INSERT INTO admin_requests (name, email, password, status, phone) VALUES (%s,%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending', None))
                 req_id = cursor.fetchone()['request_id']
                 conn.commit()
                 # notify super admins
@@ -899,7 +906,7 @@ def auth_microsoft():
                                 recipients=[sa['email']]
                             )
                             msg.body = (
-                                f"Hello Super Admin,\n\nA new admin registration request via Microsoft Sign-in is awaiting your approval.\n\nName  : {name}\nEmail : {email}\n\nPlease log in and approve or reject this request: {url_for('admin_login', _external=True)}\n\nRegards,\nShopCart System"
+                                f"Hello Super Admin,\n\nA new admin registration request via Microsoft Sign-in is awaiting your approval.\n\nName  : {name}\nEmail : {email}\nPhone : N/A\n\nPlease log in and approve or reject this request: {url_for('admin_login', _external=True)}\n\nRegards,\nShopCart System"
                             )
                             send_email(msg)
                 except Exception as mail_err:
@@ -1230,8 +1237,8 @@ def approve_request(req_id):
 
     try:
         cursor.execute(
-            "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,1,0)",
-            (req['name'], req['email'], req['password'])
+            "INSERT INTO admin (name, email, password, phone, is_approved, is_super_admin) VALUES (%s,%s,%s,%s,1,0)",
+            (req['name'], req['email'], req['password'], req.get('phone'))
         )
         cursor.execute("UPDATE admin_requests SET status='approved' WHERE request_id=%s", (req_id,))
         conn.commit()
@@ -1285,6 +1292,7 @@ def edit_request(req_id):
     # POST - update the request
     name = request.form.get('name', '').strip()
     email = request.form.get('email', '').strip()
+    phone = request.form.get('phone', '').strip()
     new_password = request.form.get('password', '')
 
     try:
@@ -1292,13 +1300,13 @@ def edit_request(req_id):
         if new_password:
             hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
             cursor.execute(
-                "UPDATE admin_requests SET name=%s, email=%s, password=%s WHERE request_id=%s",
-                (name, email, hashed, req_id)
+                "UPDATE admin_requests SET name=%s, email=%s, password=%s, phone=%s WHERE request_id=%s",
+                (name, email, hashed, phone, req_id)
             )
         else:
             cursor.execute(
-                "UPDATE admin_requests SET name=%s, email=%s WHERE request_id=%s",
-                (name, email, req_id)
+                "UPDATE admin_requests SET name=%s, email=%s, phone=%s WHERE request_id=%s",
+                (name, email, phone, req_id)
             )
         conn.commit()
 
@@ -1307,13 +1315,13 @@ def edit_request(req_id):
             try:
                 if hashed:
                     cursor.execute(
-                        "UPDATE admin SET name=%s, email=%s, password=%s WHERE email=%s",
-                        (name, email, hashed, original_email)
+                        "UPDATE admin SET name=%s, email=%s, password=%s, phone=%s WHERE email=%s",
+                        (name, email, hashed, phone, original_email)
                     )
                 else:
                     cursor.execute(
-                        "UPDATE admin SET name=%s, email=%s WHERE email=%s",
-                        (name, email, original_email)
+                        "UPDATE admin SET name=%s, email=%s, phone=%s WHERE email=%s",
+                        (name, email, phone, original_email)
                     )
                 conn.commit()
                 flash("Request and approved admin record updated.", "success")
