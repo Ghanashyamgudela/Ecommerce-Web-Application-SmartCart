@@ -76,4 +76,14 @@ MICROSOFT_REDIRECT_URI = os.environ.get("MICROSOFT_REDIRECT_URI") or (OAUTH_REDI
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 DEFAULT_TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
+# Telegram bot settings
+# Optional: set TELEGRAM_BOT_USERNAME (e.g. ShopCart_admin_bot) so links can be constructed
+TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "ShopCart_admin_bot")
+# Optional: explicit deep-link to the bot (overrides username-based link)
+TELEGRAM_BOT_LINK = os.environ.get("TELEGRAM_BOT_LINK") or f"https://t.me/{TELEGRAM_BOT_USERNAME}"
+# Webhook path the bot should POST updates to (make sure your reverse proxy routes this)
+TELEGRAM_WEBHOOK_PATH = os.environ.get("TELEGRAM_WEBHOOK_PATH", "/telegram-webhook")
+# Full webhook URL (useful when calling setWebhook); if not provided it can be constructed
+TELEGRAM_WEBHOOK_URL = os.environ.get("TELEGRAM_WEBHOOK_URL")
+
 
