@@ -462,7 +462,11 @@ def verify_otp_get():
             qr_data = f"data:image/png;base64,{qr_b64}"
         # also prepare a Telegram deep-link QR so the user can quickly open the bot
         try:
-            tlink = getattr(config, 'TELEGRAM_BOT_LINK', 'https://t.me/ShopCart_admin_bot')
+            bot_link = getattr(config, 'TELEGRAM_BOT_LINK', None)
+            if not bot_link:
+                bot_username = getattr(config, 'TELEGRAM_BOT_USERNAME', 'ShopCart_admin_bot')
+                bot_link = f'https://t.me/{bot_username}'
+            tlink = bot_link
             tqr = qrcode.make(tlink)
             tbuff = io.BytesIO()
             tqr.save(tbuff, format="PNG")
@@ -1197,7 +1201,10 @@ def admin_reset_password():
 def request_submitted(token):
     # show a confirmation page with the bot deep-link QR for the provided token
     try:
-        bot_base = getattr(config, 'TELEGRAM_BOT_LINK', 'https://t.me/ShopCart_admin_bot')
+        bot_base = getattr(config, 'TELEGRAM_BOT_LINK', None)
+        if not bot_base:
+            bot_username = getattr(config, 'TELEGRAM_BOT_USERNAME', 'ShopCart_admin_bot')
+            bot_base = f'https://t.me/{bot_username}'
         deep_link = f"{bot_base}?start={token}"
         qr = qrcode.make(deep_link)
         buffered = io.BytesIO()
