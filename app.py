@@ -551,6 +551,20 @@ def verify_otp_post():
                 )
             conn.commit()
             req_token = token
+        except psycopg2.IntegrityError as ie:
+            conn.rollback()
+            conn.close()
+            # Detect duplicate-email unique constraint and show friendlier message
+            constraint = ''
+            try:
+                constraint = ie.diag.constraint_name or ''
+            except Exception:
+                constraint = ''
+            if 'admin_requests_email_key' in constraint or 'duplicate key' in str(ie).lower() or 'admin_requests_email_key' in str(ie).lower():
+                flash("A request with this email already exists.", "warning")
+                return redirect('/admin-signup')
+            flash(f"Error saving request: {ie}", "danger")
+            return redirect('/verify-otp')
         except Exception as e:
             conn.close()
             flash(f"Error saving request: {e}", "danger")
@@ -972,6 +986,20 @@ def auth_microsoft():
                 except Exception:
                     pass
                 return redirect(url_for('request_submitted', token=token))
+            except psycopg2.IntegrityError as ie:
+                conn.rollback()
+                conn.close()
+                constraint = ''
+                try:
+                    constraint = ie.diag.constraint_name or ''
+                except Exception:
+                    constraint = ''
+                if 'admin_requests_email_key' in constraint or 'duplicate key' in str(ie).lower() or 'admin_requests_email_key' in str(ie).lower():
+                    flash('A request with this email already exists.', 'warning')
+                    return redirect('/admin-signup')
+                app.logger.exception('Failed to save admin request: %s', ie)
+                flash('Failed to submit admin request. Try again later.', 'danger')
+                return redirect('/admin-signup')
             except Exception as e:
                 conn.rollback()
                 conn.close()
