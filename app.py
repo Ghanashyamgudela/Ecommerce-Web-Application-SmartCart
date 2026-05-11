@@ -370,6 +370,9 @@ def init_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image TEXT",
         "ALTER TABLE admin_requests ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
         "ALTER TABLE admin ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
+        "ALTER TABLE admin_requests ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255)",
+        "ALTER TABLE admin ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255)",
+        "ALTER TABLE admin_requests ADD COLUMN IF NOT EXISTS telegram_token VARCHAR(255)",
     ]:
         try:
             cursor.execute(col_sql)
@@ -448,6 +451,7 @@ def admin_signup():
 @app.route('/verify-otp', methods=['GET'])
 def verify_otp_get():
     qr_data = None
+    telegram_qr = None
     try:
         prov = session.get('mfa_provisioning_uri')
         if prov:
@@ -456,15 +460,26 @@ def verify_otp_get():
             qr.save(buffered, format="PNG")
             qr_b64 = base64.b64encode(buffered.getvalue()).decode()
             qr_data = f"data:image/png;base64,{qr_b64}"
+        # also prepare a Telegram deep-link QR so the user can quickly open the bot
+        try:
+            tlink = getattr(config, 'TELEGRAM_BOT_LINK', 'https://t.me/ShopCart_admin_bot')
+            tqr = qrcode.make(tlink)
+            tbuff = io.BytesIO()
+            tqr.save(tbuff, format="PNG")
+            t_b64 = base64.b64encode(tbuff.getvalue()).decode()
+            telegram_qr = f"data:image/png;base64,{t_b64}"
+        except Exception:
+            telegram_qr = None
     except Exception:
         qr_data = None
-    return render_template('admin/verify_otp.html', qr_data=qr_data)
+    return render_template('admin/verify_otp.html', qr_data=qr_data, telegram_qr=telegram_qr)
 
 
 @app.route('/verify-otp', methods=['POST'])
 def verify_otp_post():
     user_otp = request.form['otp']
     password = request.form['password']
+    telegram_chat_id = request.form.get('telegram_chat_id', '').strip()
 
     # If TOTP flow is active, verify using the shared secret
     if session.get('mfa_secret'):
@@ -487,6 +502,7 @@ def verify_otp_post():
     requester_name  = session.get('signup_name', '')
     requester_email = session.get('signup_email', '')
     requester_phone = session.get('signup_phone', '')
+    requester_telegram = telegram_chat_id or session.get('signup_telegram', '')
 
     conn   = get_db_connection()
     cursor = conn.cursor()
@@ -516,17 +532,21 @@ def verify_otp_post():
             )
             existing_rejected = cursor.fetchone()
 
+            # generate a stable token for Telegram deep-linking
+            token = uuid.uuid4().hex
+
             if existing_rejected:
                 cursor.execute(
-                    "UPDATE admin_requests SET name=%s, password=%s, phone=%s, status='pending', created_at=CURRENT_TIMESTAMP WHERE email=%s",
-                    (requester_name, hashed, requester_phone, requester_email)
+                    "UPDATE admin_requests SET name=%s, password=%s, phone=%s, telegram_chat_id=%s, telegram_token=%s, status='pending', created_at=CURRENT_TIMESTAMP WHERE email=%s",
+                    (requester_name, hashed, requester_phone, requester_telegram, token, requester_email)
                 )
             else:
                 cursor.execute(
-                    "INSERT INTO admin_requests (name, email, password, phone) VALUES (%s,%s,%s,%s)",
-                    (requester_name, requester_email, hashed, requester_phone)
+                    "INSERT INTO admin_requests (name, email, password, phone, telegram_chat_id, telegram_token) VALUES (%s,%s,%s,%s,%s,%s)",
+                    (requester_name, requester_email, hashed, requester_phone, requester_telegram, token)
                 )
             conn.commit()
+            req_token = token
         except Exception as e:
             conn.close()
             flash(f"Error saving request: {e}", "danger")
@@ -565,8 +585,18 @@ def verify_otp_post():
             except Exception:
                 pass
 
-        for k in ['otp', 'signup_name', 'signup_email', 'signup_phone', 'otp_purpose']:
+        # clear temporary session state
+        for k in ['otp', 'signup_name', 'signup_email', 'signup_phone', 'signup_telegram', 'otp_purpose']:
             session.pop(k, None)
+
+        # If we generated a request token, show the confirmation page with the bot deep-link
+        if 'req_token' in locals():
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return redirect(url_for('request_submitted', token=req_token))
+
         flash("Registration request submitted! Please wait for super admin approval.", "info")
         return redirect('/admin-login')
 
@@ -912,7 +942,8 @@ def auth_microsoft():
                 # store a placeholder password (random) since admin will be approved and set later
                 random_pw = uuid.uuid4().hex
                 hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
-                cursor.execute('INSERT INTO admin_requests (name, email, password, status, phone) VALUES (%s,%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending', None))
+                token = uuid.uuid4().hex
+                cursor.execute('INSERT INTO admin_requests (name, email, password, status, phone, telegram_chat_id, telegram_token) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending', None, None, token))
                 req_id = cursor.fetchone()['request_id']
                 conn.commit()
                 # notify super admins
@@ -932,9 +963,11 @@ def auth_microsoft():
                             send_email(msg)
                 except Exception as mail_err:
                     app.logger.error('Failed to notify super admin(s): %s', mail_err)
-                conn.close()
-                flash('Admin request submitted! Please wait for super admin approval.', 'success')
-                return redirect('/admin-login')
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                return redirect(url_for('request_submitted', token=token))
             except Exception as e:
                 conn.rollback()
                 conn.close()
@@ -1160,6 +1193,55 @@ def admin_reset_password():
     return redirect('/admin-login')
 
 
+@app.route('/admin/request-submitted/<token>')
+def request_submitted(token):
+    # show a confirmation page with the bot deep-link QR for the provided token
+    try:
+        bot_base = getattr(config, 'TELEGRAM_BOT_LINK', 'https://t.me/ShopCart_admin_bot')
+        deep_link = f"{bot_base}?start={token}"
+        qr = qrcode.make(deep_link)
+        buffered = io.BytesIO()
+        qr.save(buffered, format="PNG")
+        qr_b64 = base64.b64encode(buffered.getvalue()).decode()
+        qr_data = f"data:image/png;base64,{qr_b64}"
+        return render_template('admin/request_submitted.html', deep_link=deep_link, qr_data=qr_data)
+    except Exception as e:
+        app.logger.exception('request_submitted render failed: %s', e)
+        flash('Request submitted. Open the bot to link your Telegram chat.', 'info')
+        return redirect('/admin-login')
+
+
+@app.route('/telegram-webhook', methods=['POST'])
+def telegram_webhook():
+    # Telegram will POST updates here. We look for /start <token> messages and link chat_id.
+    try:
+        data = request.get_json(force=True)
+        message = data.get('message') or data.get('edited_message') or {}
+        text = message.get('text', '')
+        chat = message.get('chat') or {}
+        chat_id = chat.get('id')
+        if text and text.strip().startswith('/start') and chat_id:
+            parts = text.strip().split()
+            token = parts[1] if len(parts) > 1 else None
+            if token:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT request_id FROM admin_requests WHERE telegram_token=%s", (token,))
+                row = cursor.fetchone()
+                if row:
+                    cursor.execute("UPDATE admin_requests SET telegram_chat_id=%s WHERE telegram_token=%s", (str(chat_id), token))
+                    conn.commit()
+                    try:
+                        send_telegram_message(str(chat_id), "✅ Your Telegram is now linked to your ShopCart admin request. You'll receive a notification once it's approved.")
+                    except Exception:
+                        pass
+                conn.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        app.logger.exception('telegram webhook failed: %s', e)
+        return jsonify({'ok': False}), 500
+
+
 # ================================================================
 # ADMIN DASHBOARD
 # ================================================================
@@ -1258,13 +1340,13 @@ def approve_request(req_id):
 
     try:
         cursor.execute(
-            "INSERT INTO admin (name, email, password, phone, is_approved, is_super_admin) VALUES (%s,%s,%s,%s, True,False)",
-            (req['name'], req['email'], req['password'], req.get('phone'))
+            "INSERT INTO admin (name, email, password, phone, telegram_chat_id, is_approved, is_super_admin) VALUES (%s,%s,%s,%s,%s, True,False)",
+            (req['name'], req['email'], req['password'], req.get('phone'), req.get('telegram_chat_id'))
         )
         cursor.execute("UPDATE admin_requests SET status='approved' WHERE request_id=%s", (req_id,))
         conn.commit()
         flash(f"Admin '{req['name']}' approved successfully!", "success")
-        # send approval email to the newly approved admin
+        # send approval email to the newly approved admin (don't add another success flash)
         try:
             msg = Message("ShopCart Admin Account Approved", sender=app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME')), recipients=[req['email']])
             msg.body = (
@@ -1275,7 +1357,6 @@ def approve_request(req_id):
                 "Regards,\nShopCart Team"
             )
             send_email(msg)
-            flash("Approval email sent to the admin.", "success")
         except Exception as e:
             # don't block the flow on mail errors; notify the super admin
             flash(f"Approved but failed to send email: {str(e)}", "warning")
