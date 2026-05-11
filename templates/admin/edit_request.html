@@ -17,6 +17,10 @@
                     <input type="email" name="email" class="form-control" value="{{ req.email }}" required>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" name="phone" class="form-control" value="{{ req.phone or '' }}" placeholder="Optional phone number">
+                </div>
+                <div class="form-group">
                     <label class="form-label">Password <span style="font-size:0.75rem;font-weight:400;color:var(--gray-500);">(leave blank to keep current)</span></label>
                     <input type="password" name="password" class="form-control" placeholder="Enter new password to reset">
                 </div>
