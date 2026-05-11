@@ -667,11 +667,23 @@ def admin_login():
         return redirect('/admin-login')
 
     stored_pw = admin['password']
-    if isinstance(stored_pw, str):
-        stored_pw = stored_pw.encode()
+    # Normalize stored password to bytes; DB drivers may return str, memoryview, or bytes
+    try:
+        if isinstance(stored_pw, memoryview):
+            stored_pw = stored_pw.tobytes()
+        elif isinstance(stored_pw, str):
+            stored_pw = stored_pw.encode()
+    except Exception:
+        # leave as-is and let bcrypt raise a controlled error below
+        pass
 
-    if not bcrypt.checkpw(password.encode(), stored_pw):
-        flash("Incorrect password!", "danger")
+    try:
+        if not bcrypt.checkpw(password.encode(), stored_pw):
+            flash("Incorrect password!", "danger")
+            return redirect('/admin-login')
+    except (ValueError, TypeError) as pw_err:
+        app.logger.exception('Stored password has invalid format for admin %s: %s', email, pw_err)
+        flash('Account password is corrupted or unsupported. Contact support.', 'danger')
         return redirect('/admin-login')
 
     session['admin_id']       = admin['admin_id']
