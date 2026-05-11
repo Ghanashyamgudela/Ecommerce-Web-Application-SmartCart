@@ -18,6 +18,7 @@
                     <th>#</th>
                     <th>Name</th>
                     <th>Email</th>
+                    <th>Phone</th>
                     <th>Submitted</th>
                     <th>Status</th>
                     <th style="text-align:center;">Actions</th>
@@ -29,6 +30,7 @@
                     <td style="color:var(--gray-500);font-weight:600;">{{ req.request_id }}</td>
                     <td style="font-weight:600;">{{ req.name }}</td>
                     <td style="font-size:0.82rem;color:var(--gray-500);">{{ req.email }}</td>
+                    <td style="font-size:0.82rem;color:var(--gray-500);">{{ req.phone or '—' }}</td>
                     <td style="font-size:0.82rem;color:var(--gray-500);">{{ req.created_at | fdate }}</td>
                     <td>
                         {% if req.status == 'pending' %}
