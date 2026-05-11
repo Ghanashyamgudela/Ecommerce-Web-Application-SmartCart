@@ -408,10 +408,13 @@ def home():
 @app.route('/admin-signup', methods=['GET', 'POST'])
 def admin_signup():
     if request.method == 'GET':
+        # Clear any stale signup/session state to avoid using previous email values
+        for k in ['signup_name', 'signup_email', 'signup_phone', 'signup_telegram', 'mfa_secret', 'mfa_purpose', 'mfa_provisioning_uri']:
+            session.pop(k, None)
         return render_template('admin/admin_signup.html')
 
-    name  = request.form['name']
-    email = request.form['email']
+    name  = request.form['name'].strip()
+    email = request.form['email'].strip().lower()
     phone = request.form.get('phone', '').strip()
 
     conn   = get_db_connection()
@@ -504,7 +507,7 @@ def verify_otp_post():
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
     requester_name  = session.get('signup_name', '')
-    requester_email = session.get('signup_email', '')
+    requester_email = (session.get('signup_email', '') or '').strip().lower()
     requester_phone = session.get('signup_phone', '')
     requester_telegram = telegram_chat_id or session.get('signup_telegram', '')
 
