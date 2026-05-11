@@ -1258,7 +1258,7 @@ def approve_request(req_id):
 
     try:
         cursor.execute(
-            "INSERT INTO admin (name, email, password, phone, is_approved, is_super_admin) VALUES (%s,%s,%s,%s,1,0)",
+            "INSERT INTO admin (name, email, password, phone, is_approved, is_super_admin) VALUES (%s,%s,%s,%s, True,False)",
             (req['name'], req['email'], req['password'], req.get('phone'))
         )
         cursor.execute("UPDATE admin_requests SET status='approved' WHERE request_id=%s", (req_id,))
@@ -2552,13 +2552,13 @@ def seed_super_admin():
 
     if existing:
         cursor.execute(
-            "UPDATE admin SET name=%s, password=%s, is_approved=1, is_super_admin=1 WHERE email=%s",
+            "UPDATE admin SET name=%s, password=%s, is_approved=True, is_super_admin=True WHERE email=%s",
             (name, hashed, email)
         )
         print(f"[seed] Updated '{email}' → Super Admin.")
     else:
         cursor.execute(
-            "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,1,1)",
+            "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,True,True)",
             (name, email, hashed)
         )
         print(f"[seed] Created Super Admin '{email}'.")
