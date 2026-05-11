@@ -498,7 +498,7 @@ def verify_otp_post():
 
     if admin_count == 0 and req_count == 0:
         cursor.execute(
-            "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,1,1)",
+            "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,True,True)",
             (requester_name, requester_email, hashed)
         )
         conn.commit()
@@ -534,7 +534,7 @@ def verify_otp_post():
 
         try:
             cursor.execute(
-                "SELECT email FROM admin WHERE is_super_admin=1 AND is_approved=1"
+                "SELECT email FROM admin WHERE is_super_admin=True AND is_approved=True"
             )
             super_admins = cursor.fetchall()
             conn.close()
@@ -917,7 +917,7 @@ def auth_microsoft():
                 conn.commit()
                 # notify super admins
                 try:
-                    cursor.execute("SELECT email FROM admin WHERE is_super_admin=1 AND is_approved=1")
+                    cursor.execute("SELECT email FROM admin WHERE is_super_admin=True AND is_approved=True")
                     super_admins = cursor.fetchall()
                     if super_admins:
                         for sa in super_admins:
