@@ -1,0 +1,23 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Request Submitted{% endblock %}
+{% block page_title %}Registration Request Sent{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:700px;margin:0 auto;text-align:center;">
+    <div class="card-body">
+        <h3>✅ Request Submitted</h3>
+        <p>Your admin registration request has been submitted and is pending Super Admin approval.</p>
+        <p>To receive a Telegram notification when your account is approved, open the bot below and press <strong>Start</strong>.</p>
+        <div style="margin:1rem 0;">
+            <a href="{{ deep_link }}" target="_blank" class="btn btn-amazon">Open Bot &amp; Start</a>
+        </div>
+        {% if qr_data %}
+        <div style="margin-top:1rem;">
+            <img src="{{ qr_data }}" alt="Open Telegram Bot" style="max-width:220px;border-radius:8px;border:1px solid #ddd;padding:8px;background:#fff;"/>
+        </div>
+        {% endif %}
+        <p style="margin-top:0.75rem;font-size:0.9rem;color:var(--gray-600);">If you prefer, get your <strong>Telegram Chat ID</strong> from <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> and paste it in your profile or contact the Super Admin.</p>
+        <div style="margin-top:1rem;"><a href="/" class="btn btn-outline">Return Home</a></div>
+    </div>
+</div>
+{% endblock %}
