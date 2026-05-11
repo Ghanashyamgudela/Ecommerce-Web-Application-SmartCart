@@ -516,6 +516,25 @@ def verify_otp_post():
     cursor.execute("SELECT COUNT(*) as cnt FROM admin_requests")
     req_count = cursor.fetchone()['cnt']
 
+    # Basic validation: ensure we have an email to work with
+    if not requester_email:
+        conn.close()
+        flash("Email missing. Please start signup again.", "danger")
+        return redirect('/admin-signup')
+
+    # Prevent duplicate requests or already-registered emails
+    cursor.execute("SELECT admin_id FROM admin WHERE email=%s", (requester_email,))
+    if cursor.fetchone():
+        conn.close()
+        flash("Email already registered. Please login.", "warning")
+        return redirect('/admin-signup')
+
+    cursor.execute("SELECT request_id FROM admin_requests WHERE email=%s AND status IN ('pending','approved')", (requester_email,))
+    if cursor.fetchone():
+        conn.close()
+        flash("A request with this email already exists.", "warning")
+        return redirect('/admin-signup')
+
     if admin_count == 0 and req_count == 0:
         cursor.execute(
             "INSERT INTO admin (name, email, password, is_approved, is_super_admin) VALUES (%s,%s,%s,True,True)",
