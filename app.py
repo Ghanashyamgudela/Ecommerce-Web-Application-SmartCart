@@ -705,17 +705,9 @@ except (ValueError, TypeError) as pw_err:
     app.logger.exception('LOGIN DEBUG error: %s', pw_err)
     flash('Account password is corrupted or unsupported. Contact support.', 'danger')
     return redirect('/admin-login')
-    except Exception:
-        pass
+    
 
-    try:
-        if not bcrypt.checkpw(password.encode(), stored_pw):
-            flash("Incorrect password!", "danger")
-            return redirect('/admin-login')
-    except (ValueError, TypeError) as pw_err:
-        app.logger.exception('Stored password has invalid format for admin %s: %s', email, pw_err)
-        flash('Account password is corrupted or unsupported. Contact support.', 'danger')
-        return redirect('/admin-login')
+    
 
     session['admin_id']       = admin['admin_id']
     session['admin_name']     = admin['name']
