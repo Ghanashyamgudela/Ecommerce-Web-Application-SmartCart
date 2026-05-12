@@ -666,14 +666,17 @@ def admin_login():
         return redirect('/admin-login')
 
     stored_pw = admin['password']
-    # Normalize stored password to bytes; DB drivers may return str, memoryview, or bytes
     try:
         if isinstance(stored_pw, memoryview):
-            stored_pw = stored_pw.tobytes()
-        elif isinstance(stored_pw, str):
-            stored_pw = stored_pw.encode()
+            stored_pw = bytes(stored_pw)
+            if isinstance(stored_pw, str):
+                stored_pw = stored_pw.encode('utf-8')
+            # verify it looks like a valid bcrypt hash
+                if not stored_pw.startswith(b'$2b$') and not stored_pw.startswith(b'$2a$'):
+                    app.logger.error('Invalid bcrypt hash for admin %s: %r', email, stored_pw[:20])
+                    flash('Account password is corrupted. Contact support.', 'danger')
+                    return redirect('/admin-login')
     except Exception:
-        # leave as-is and let bcrypt raise a controlled error below
         pass
 
     try:
@@ -1407,9 +1410,16 @@ def approve_request(req_id):
         return redirect('/admin/requests')
 
     try:
+    # normalize password bytes before inserting into admin table
+        raw_pw = req['password']
+        if isinstance(raw_pw, memoryview):
+            raw_pw = raw_pw.tobytes()
+        elif isinstance(raw_pw, str):
+            raw_pw = raw_pw.encode()
+
         cursor.execute(
             "INSERT INTO admin (name, email, password, phone, telegram_chat_id, is_approved, is_super_admin) VALUES (%s,%s,%s,%s,%s, True,False)",
-            (req['name'], req['email'], req['password'], req.get('phone'), req.get('telegram_chat_id'))
+            (req['name'], req['email'], raw_pw.decode(), req.get('phone'), req.get('telegram_chat_id'))
         )
         cursor.execute("UPDATE admin_requests SET status='approved' WHERE request_id=%s", (req_id,))
         conn.commit()
