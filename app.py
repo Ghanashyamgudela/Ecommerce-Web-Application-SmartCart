@@ -267,11 +267,11 @@ def get_db_connection():
         )
     else:
         conn = psycopg2.connect(
-            host=config.DB_HOST,
-            database=config.DB_NAME,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            port=config.DB_PORT,
+            host="localhost",
+            database="postgres",
+            user="postgres",
+            password="Ghana@1230",
+            port="5432",
             cursor_factory=psycopg2.extras.RealDictCursor
         )
 
@@ -672,7 +672,26 @@ def admin_login():
         if isinstance(stored_pw, memoryview):
             stored_pw = stored_pw.tobytes()
         elif isinstance(stored_pw, str):
-            stored_pw = stored_pw.encode()
+            # Handle common bad formats:
+            # - a plain str of the hash (e.g. "$2b$..." ) -> encode()
+            # - a stringified bytes literal (e.g. "b'$2b$...'" ) -> ast.literal_eval -> bytes
+            try:
+                if stored_pw.startswith("b'") or stored_pw.startswith('b"'):
+                    import ast
+                    try:
+                        evaluated = ast.literal_eval(stored_pw)
+                        # ast.literal_eval on a bytes literal returns bytes
+                        if isinstance(evaluated, (bytes, bytearray)):
+                            stored_pw = bytes(evaluated)
+                        else:
+                            stored_pw = stored_pw.encode()
+                    except Exception:
+                        # fallback to plain encode
+                        stored_pw = stored_pw.encode()
+                else:
+                    stored_pw = stored_pw.encode()
+            except Exception:
+                stored_pw = stored_pw.encode()
     except Exception:
         # leave as-is and let bcrypt raise a controlled error below
         pass
