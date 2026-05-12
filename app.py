@@ -221,6 +221,24 @@ def send_email(msg):
 
     threading.Thread(target=_send).start()
 
+@app.route('/debug/admin-pw/<email>')
+def debug_admin_pw(email):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT email, password FROM admin WHERE email=%s", (email,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'not found'})
+    pw = row['password']
+    return jsonify({
+        'email': row['email'],
+        'type': str(type(pw)),
+        'repr': repr(pw[:30] if pw else None),
+        'starts_with_2b': str(pw).startswith('$2b$') if pw else False,
+        'length': len(pw) if pw else 0
+    })
+
 @app.route('/_email-test', methods=['GET'])
 def email_test():
     """Quick test route: /_email-test?to=you@example.com&subject=hi"""
