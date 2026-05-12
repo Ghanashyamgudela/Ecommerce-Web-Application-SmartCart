@@ -74,7 +74,10 @@ MICROSOFT_CLIENT_SECRET = os.environ.get("MICROSOFT_CLIENT_SECRET")
 MICROSOFT_REDIRECT_URI = os.environ.get("MICROSOFT_REDIRECT_URI") or (OAUTH_REDIRECT_BASE.rstrip('/') + "/login/microsoft/callback" if OAUTH_REDIRECT_BASE else None)
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-DEFAULT_TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+TELEGRAM_BOT_TOKEN=os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_LINK = 'https://t.me/ShopCart_admin_bot'
+TELEGRAM_CHAT_ID=os.environ.get("TELEGRAM_CHAT_ID")
 
 # Telegram bot settings
 # Optional: set TELEGRAM_BOT_USERNAME (e.g. ShopCart_admin_bot) so links can be constructed
