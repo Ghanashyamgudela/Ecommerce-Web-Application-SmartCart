@@ -684,16 +684,27 @@ def admin_login():
         return redirect('/admin-login')
 
     stored_pw = admin['password']
-    try:
-        if isinstance(stored_pw, memoryview):
-            stored_pw = bytes(stored_pw)
-            if isinstance(stored_pw, str):
-                stored_pw = stored_pw.encode('utf-8')
-            # verify it looks like a valid bcrypt hash
-                if not stored_pw.startswith(b'$2b$') and not stored_pw.startswith(b'$2a$'):
-                    app.logger.error('Invalid bcrypt hash for admin %s: %r', email, stored_pw[:20])
-                    flash('Account password is corrupted. Contact support.', 'danger')
-                    return redirect('/admin-login')
+app.logger.info('LOGIN DEBUG: type=%s repr=%r', type(stored_pw), stored_pw[:20] if stored_pw else None)
+
+try:
+    if isinstance(stored_pw, memoryview):
+        stored_pw = bytes(stored_pw)
+    if isinstance(stored_pw, str):
+        stored_pw = stored_pw.encode('utf-8')
+    
+    app.logger.info('LOGIN DEBUG after encode: type=%s starts_with=%s', type(stored_pw), stored_pw[:4])
+    
+    result = bcrypt.checkpw(password.encode('utf-8'), stored_pw)
+    app.logger.info('LOGIN DEBUG bcrypt result=%s', result)
+    
+    if not result:
+        flash("Incorrect password!", "danger")
+        return redirect('/admin-login')
+        
+except (ValueError, TypeError) as pw_err:
+    app.logger.exception('LOGIN DEBUG error: %s', pw_err)
+    flash('Account password is corrupted or unsupported. Contact support.', 'danger')
+    return redirect('/admin-login')
     except Exception:
         pass
 
