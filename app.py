@@ -16,20 +16,19 @@ BOT_TOKEN = getattr(config, 'TELEGRAM_BOT_TOKEN', 'YOUR_BOT_TOKEN')
 DEFAULT_TELEGRAM_CHAT_ID = getattr(config, 'TELEGRAM_CHAT_ID', 'YOUR_CHAT_ID')
 
 def send_telegram_message(chat_id_or_none, message):
+    chat_id = chat_id_or_none or DEFAULT_TELEGRAM_CHAT_ID
+    if not chat_id or chat_id in ('YOUR_CHAT_ID', ''):
+        app.logger.warning('send_telegram_message: no valid chat_id, skipping')
+        return
+    if not BOT_TOKEN or BOT_TOKEN == 'YOUR_BOT_TOKEN':
+        app.logger.warning('send_telegram_message: BOT_TOKEN not configured, skipping')
+        return
     try:
-        chat_id = chat_id_or_none or DEFAULT_TELEGRAM_CHAT_ID
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        data = {
-            "chat_id": chat_id,
-            "text": message
-        }
-        # fire-and-forget; short timeout so it doesn't hang the request
-        requests.post(url, data=data, timeout=5)
+        resp = requests.post(url, data={"chat_id": chat_id, "text": message}, timeout=5)
+        app.logger.info('Telegram response: %s %s', resp.status_code, resp.text)
     except Exception as e:
-        try:
-            app.logger.exception('Failed to send Telegram message: %s', e)
-        except Exception:
-            pass
+        app.logger.exception('Failed to send Telegram message: %s', e)
 import razorpay
 import traceback
 import uuid
@@ -504,10 +503,7 @@ def verify_otp_post():
             flash("Invalid OTP. Try again!", "danger")
             return redirect('/verify-otp')
 
-    hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
     requester_name  = session.get('signup_name', '')
     requester_email = (session.get('signup_email', '') or '').strip().lower()
@@ -801,7 +797,7 @@ def auth_google():
         if not user:
             # create minimal user; use ON CONFLICT to avoid duplicate-key issues
             random_pw = uuid.uuid4().hex
-            hashed = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
+            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
             try:
                 cursor.execute(
                     """
@@ -996,10 +992,7 @@ def auth_microsoft():
             try:
                 # store a placeholder password (random) since admin will be approved and set later
                 random_pw = uuid.uuid4().hex
-                hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+                hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
                 token = uuid.uuid4().hex
                 cursor.execute('INSERT INTO admin_requests (name, email, password, status, phone, telegram_chat_id, telegram_token) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending', None, None, token))
                 req_id = cursor.fetchone()['request_id']
@@ -1146,10 +1139,7 @@ def auth_facebook():
         user = cursor.fetchone()
         if not user:
             random_pw = uuid.uuid4().hex
-            hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
             try:
                 cursor.execute(
                     """
@@ -1252,10 +1242,7 @@ def admin_reset_password():
         flash("Passwords do not match!", "danger")
         return redirect('/admin-reset-password')
 
-    hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
     email  = session.get('reset_email')
 
     conn   = get_db_connection()
@@ -1443,22 +1430,21 @@ def approve_request(req_id):
             flash(f"Approved but failed to send email: {str(e)}", "warning")
         # Send Telegram notification to the admin (uses DEFAULT_TELEGRAM_CHAT_ID if none provided)
         try:
-            telegram_msg = (
-                f"Hello {req['name']},\n\n"
-                f"Your ShopCart admin account has been approved.\n"
-                f"Email: {req.get('email') or 'N/A'}\n"
-                f"Phone: {req.get('phone') or 'N/A'}\n\n"
-                f"You can now sign in: {url_for('admin_login', _external=True)}\n\n"
-                "Regards,\nShopCart Team"
-            )
-            # If admin record contains a chat id in `req['telegram_chat_id']`, use it; otherwise default
-            chat_id_to_use = None
-            try:
-                if isinstance(req, dict):
-                    chat_id_to_use = req.get('telegram_chat_id')
-            except Exception:
-                chat_id_to_use = None
-            send_telegram_message(chat_id_to_use, telegram_msg)
+            chat_id_to_use = req.get('telegram_chat_id') if isinstance(req, dict) else None
+            if chat_id_to_use:
+                telegram_msg = (
+                    f"✅ Hello {req['name']},\n\n"
+                    f"Your ShopCart admin account has been approved!\n"
+                    f"Email: {req.get('email') or 'N/A'}\n"
+                    f"Phone: {req.get('phone') or 'N/A'}\n\n"
+                    f"👉 Login here: {url_for('admin_login', _external=True)}\n\n"
+                    "Regards,\nShopCart Team"
+                )
+                send_telegram_message(chat_id_to_use, telegram_msg)
+                app.logger.info('Telegram notification sent to chat_id=%s', chat_id_to_use)
+            else:
+                app.logger.warning('approve_request: no telegram_chat_id for request_id=%s, skipping Telegram notify', req_id)
+                flash('Approved. Note: admin has not linked Telegram, so no Telegram notification was sent.', 'info')
         except Exception as te:
             app.logger.exception('Failed to send Telegram notification: %s', te)
             flash('Approved but failed to send Telegram notification.', 'warning')
@@ -1502,10 +1488,7 @@ def edit_request(req_id):
     try:
         hashed = None
         if new_password:
-            hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+            hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
             cursor.execute(
                 "UPDATE admin_requests SET name=%s, email=%s, password=%s, phone=%s WHERE request_id=%s",
                 (name, email, hashed, phone, req_id)
@@ -1867,7 +1850,7 @@ def admin_profile():
     admin = cursor.fetchone()
     old_image = admin['profile_image']
 
-    hashed = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode() if new_pw else admin['password']
+    hashed = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()) if new_pw else admin['password']
 
     if new_image and new_image.filename != '':
         # upload admin profile image to Cloudinary
@@ -2014,10 +1997,7 @@ def user_register():
     except Exception:
         profile_image_url = None
 
-    hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     cursor.execute(
         "INSERT INTO users (name, email, password, phone, address, profile_image) VALUES (%s,%s,%s,%s,%s,%s)",
         (name, email, hashed, phone, address, profile_image_url)
@@ -2124,10 +2104,7 @@ def user_reset_password():
         flash("Passwords do not match!", "danger")
         return redirect('/user-reset-password')
 
-    hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
     email  = session.get('user_reset_email')
 
     conn   = get_db_connection()
@@ -2722,10 +2699,7 @@ def seed_super_admin():
     name     = 'Ghana Shyam'
     password = 'Ghana@2003'
 
-    hashed = bcrypt.hashpw(
-    password.encode(),
-    bcrypt.gensalt()
-).decode()
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
     conn   = get_db_connection()
     cursor = conn.cursor()
