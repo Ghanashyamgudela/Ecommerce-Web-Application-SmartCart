@@ -267,11 +267,11 @@ def get_db_connection():
         )
     else:
         conn = psycopg2.connect(
-            host="localhost",
-            database="postgres",
-            user="postgres",
-            password="Ghana@1230",
-            port="5432",
+            host=config.DB_HOST,
+            database=config.DB_NAME,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            port=config.DB_PORT,
             cursor_factory=psycopg2.extras.RealDictCursor
         )
 
@@ -504,7 +504,10 @@ def verify_otp_post():
             flash("Invalid OTP. Try again!", "danger")
             return redirect('/verify-otp')
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
 
     requester_name  = session.get('signup_name', '')
     requester_email = (session.get('signup_email', '') or '').strip().lower()
@@ -672,26 +675,7 @@ def admin_login():
         if isinstance(stored_pw, memoryview):
             stored_pw = stored_pw.tobytes()
         elif isinstance(stored_pw, str):
-            # Handle common bad formats:
-            # - a plain str of the hash (e.g. "$2b$..." ) -> encode()
-            # - a stringified bytes literal (e.g. "b'$2b$...'" ) -> ast.literal_eval -> bytes
-            try:
-                if stored_pw.startswith("b'") or stored_pw.startswith('b"'):
-                    import ast
-                    try:
-                        evaluated = ast.literal_eval(stored_pw)
-                        # ast.literal_eval on a bytes literal returns bytes
-                        if isinstance(evaluated, (bytes, bytearray)):
-                            stored_pw = bytes(evaluated)
-                        else:
-                            stored_pw = stored_pw.encode()
-                    except Exception:
-                        # fallback to plain encode
-                        stored_pw = stored_pw.encode()
-                else:
-                    stored_pw = stored_pw.encode()
-            except Exception:
-                stored_pw = stored_pw.encode()
+            stored_pw = stored_pw.encode()
     except Exception:
         # leave as-is and let bcrypt raise a controlled error below
         pass
@@ -817,7 +801,7 @@ def auth_google():
         if not user:
             # create minimal user; use ON CONFLICT to avoid duplicate-key issues
             random_pw = uuid.uuid4().hex
-            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+            hashed = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
             try:
                 cursor.execute(
                     """
@@ -1012,7 +996,10 @@ def auth_microsoft():
             try:
                 # store a placeholder password (random) since admin will be approved and set later
                 random_pw = uuid.uuid4().hex
-                hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+                hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
                 token = uuid.uuid4().hex
                 cursor.execute('INSERT INTO admin_requests (name, email, password, status, phone, telegram_chat_id, telegram_token) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING request_id', (name, email, hashed, 'pending', None, None, token))
                 req_id = cursor.fetchone()['request_id']
@@ -1159,7 +1146,10 @@ def auth_facebook():
         user = cursor.fetchone()
         if not user:
             random_pw = uuid.uuid4().hex
-            hashed = bcrypt.hashpw(random_pw.encode(), bcrypt.gensalt())
+            hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
             try:
                 cursor.execute(
                     """
@@ -1262,7 +1252,10 @@ def admin_reset_password():
         flash("Passwords do not match!", "danger")
         return redirect('/admin-reset-password')
 
-    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
     email  = session.get('reset_email')
 
     conn   = get_db_connection()
@@ -1509,7 +1502,10 @@ def edit_request(req_id):
     try:
         hashed = None
         if new_password:
-            hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+            hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
             cursor.execute(
                 "UPDATE admin_requests SET name=%s, email=%s, password=%s, phone=%s WHERE request_id=%s",
                 (name, email, hashed, phone, req_id)
@@ -1871,7 +1867,7 @@ def admin_profile():
     admin = cursor.fetchone()
     old_image = admin['profile_image']
 
-    hashed = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()) if new_pw else admin['password']
+    hashed = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode() if new_pw else admin['password']
 
     if new_image and new_image.filename != '':
         # upload admin profile image to Cloudinary
@@ -2018,7 +2014,10 @@ def user_register():
     except Exception:
         profile_image_url = None
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
     cursor.execute(
         "INSERT INTO users (name, email, password, phone, address, profile_image) VALUES (%s,%s,%s,%s,%s,%s)",
         (name, email, hashed, phone, address, profile_image_url)
@@ -2125,7 +2124,10 @@ def user_reset_password():
         flash("Passwords do not match!", "danger")
         return redirect('/user-reset-password')
 
-    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
     email  = session.get('user_reset_email')
 
     conn   = get_db_connection()
@@ -2720,7 +2722,10 @@ def seed_super_admin():
     name     = 'Ghana Shyam'
     password = 'Ghana@2003'
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    hashed = bcrypt.hashpw(
+    password.encode(),
+    bcrypt.gensalt()
+).decode()
 
     conn   = get_db_connection()
     cursor = conn.cursor()
